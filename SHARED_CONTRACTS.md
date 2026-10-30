@@ -1,12 +1,13 @@
 # SHARED_CONTRACTS.md — Frontend ↔ Backend Handshake
 
 **Project:** NiyamPulse LIVE  
-**Contract version:** `1.0.0`  
+**Contract version:** `1.1.0`
+
 **Source of truth for DTO shapes:** `backend/schemas.py` (Pydantic v2)  
 **Target runtime:** Python 3.12 (native Windows), FastAPI; React + TypeScript + Vite frontend  
-**Status:** **SPECIFIED ONLY** — HTTP endpoints and frontend are **not implemented** in this starter.
+**Status:** **PHASE 2 LOCAL BACKEND IMPLEMENTED** — intake, original review, preview/apply, evidence access, timeline and event polling exist; frontend and sponsor integrations remain planned.
 
-**Phase 1 implementation note (2026-10-30):** Pure Python evaluator, uncommitted amendment planner and PREVIEW impact calculation now exist under `backend/services/`, using the unchanged v1 DTOs. Native Windows Python 3.12 schema and engine tests have passed. The fixture-only text parser is not PDF ingestion or a production source gate. See `backend/services/README.md` for the internal trust boundary and declared demo conventions. HTTP endpoints remain planned.
+**Phase 2 implementation note (2026-10-30):** The native Windows backend now uses the Phase 1 engine with actual PyMuPDF extraction and SQLite transactions. The parser supports a declared notice template only; unsupported input is held for review. Version 1.1.0 adds explicit original review, PDF/extraction access, document diagnostics and watcher health. See `README.md` for a reproducible synthetic walkthrough. No Sarvam call, frontend, coordinate highlighting or evaluation scorecard is claimed.
 
 > This is the cross-team agreement. The frontend may animate data received from the backend, but may not calculate eligibility, infer source trust, invent impact counts, or alter effective rules.
 
@@ -18,7 +19,7 @@
 | Allowed dev origin | `http://localhost:5173` (configure CORS explicitly) |
 | Content type | `application/json; charset=utf-8`, except PDF/audio uploads and streamed media |
 | Naming | JSON `snake_case`; TypeScript may use the same names to avoid accidental drift |
-| API version | `/api/v1` path plus `schema_version: "1.0.0"` on versioned top-level state/results |
+| API version | `/api/v1` path plus `schema_version: "1.1.0"` on versioned top-level state/results |
 | Timestamp | ISO 8601 with offset; server emits UTC `Z`, e.g. `2026-10-30T12:00:00Z` |
 | Date-only values | `YYYY-MM-DD`, interpreted as scheme-local calendar dates; default demo zone `Asia/Kolkata` |
 | IDs | Opaque stable strings, not array indexes or filenames |
@@ -56,13 +57,13 @@ Aggregation precedence in the engine: `CONFLICT` > `FAIL` > `UNKNOWN` > `PASS`. 
 
 Only a transition from overall `FAIL` to overall `PASS` is called `IMPROVED`, and only `PASS` to `FAIL` is `WORSENED`. Other uncertain transitions are `REVIEW_REQUIRED`. For unchanged overall status use `UNCHANGED`. `ImpactCounts.changed` means **number of profiles with changed overall status**; the per-rule details may change even when that count does not.
 
-## 2. Planned HTTP endpoints
+## 2. HTTP endpoints and implementation status
 
-These routes are the **implementation target**, not evidence that a server currently exists.
+Health, workspace, document intake, original review, evidence access, amendment preview/apply, timeline and event routes are implemented. Explanation, speech and audio routes remain planned. Evaluation currently returns typed HTTP 404 because no evaluation run exists. Each route below is relative to `/api/v1`.
 
 | Method / route | Body / query | Response | Side effects |
 |---|---|---|---|
-| `GET /health` | None | `{ "status": "ok", "schema_version": "1.0.0" }` | None |
+| `GET /health` | None | `{ "status": "ok", "schema_version": "1.1.0" }` | None |
 | `GET /workspaces/{workspace_id}` | None | `WorkspaceState` | None |
 | `POST /workspaces/{workspace_id}/documents` | `multipart/form-data`: `file` PDF; `kind` (`ORIGINAL`/`CORRIGENDUM`); optional `source_url` | `ImportDocumentResponse`, HTTP **202** | Queue local extraction; does **not** apply rules |
 | `GET /workspaces/{workspace_id}/amendments/{amendment_id}/preview` | None | `PreviewAmendmentResponse` | Calculate **PREVIEW** impact, never persist active rules |
@@ -87,6 +88,31 @@ For import, an HTTP **202** means accepted for processing, **not** that OCR, aut
 7. The server completes source review, version update, evaluation snapshot, and event persist **in one database transaction**, then returns the new revision.
 
 `MATCHED_CONFIGURED_SOURCE` means a configured source-channel/reference check passed; it **does not certify cryptographic authenticity**. In a demonstration using synthetic PDFs, the UI must say so.
+
+### Phase 2 additions
+
+| Method / route | Request | Response / behavior |
+|---|---|---|
+| `POST /workspaces/{workspace_id}/documents/{document_id}/review` | `ReviewOriginalRequest` (same explicit revision/name/confirmation fields as apply) | `WorkspaceState`; human-reviewed original bootstraps only an empty rule history; 409 if blocked/stale |
+| `GET /workspaces/{workspace_id}/documents/{document_id}/pdf` | None | Immutable original PDF bytes, `application/pdf`; the client may add `#page=<1-based page>` |
+| `GET /workspaces/{workspace_id}/documents/{document_id}/extraction` | None | `DocumentExtraction` with hash, extraction ID/version and frozen `ExtractedPage[]` |
+
+Additional v1.1 fields:
+
+- `SourceDocument`: `intake_state`, server-owned `acquisition_channel` (`UPLOAD` / `LOCAL_WATCH`), `processing_mode` (`LOCAL_PDF` / `CACHED_EXTRACTION`), server-configured `synthetic`, `diagnostics[]`, `source_gate`, `review_state`, `reviewed_by`, `reviewed_at`.
+- `WorkspaceState`: `scheme_id`, `as_of_date`, `synthetic`, and `watcher: WatcherHealth` (`enabled`, observed `running`, `watched_directory`, `last_scan_at`, `last_error`). Defaults preserve an empty state; configured backend responses supply actual scheme/date.
+- `HealthResponse`: `status: "ok"` plus `schema_version: "1.1.0"`.
+- `ExtractedPage`: 1-based `page_number`, exact untrimmed page `text`, `width` and `height` in PDF points. `DocumentExtraction` binds these pages to `document_id`, `document_sha256`, `extraction_id`, and `extractor_version`.
+
+Workspace source configuration, profile loading and demo setup are local operator actions, not HTTP trust flags. An upload `source_url` is acquisition metadata only. Source matching requires configured content hashes or the server's actual configured local-watch origin. Duplicate content preserves the first acquisition; a later rename/URL/channel does not silently upgrade trust. The local watcher accepts corrigenda only; original notices use upload + explicit original review. Live health is reported only while the observer and worker are running.
+
+The current parser checks all text against the declared v1 notice grammar and compares candidate values, scope, IDs, operations and dates with a fresh parse of the immutable extraction. Evidence includes both the condition and effective-date passage. It is not a general scholarship-language interpreter. Unsupported/ambiguous input never applies a supported subset. Scanned PDFs without embedded text are `NEEDS_REVIEW` with an OCR diagnostic. Failed PDF extraction is `FAILED`. All gates are rerun inside the apply transaction.
+
+Source bytes and extraction snapshots are immutable SQLite records; SHA-256 integrity is rechecked on access/apply. Caches are keyed by PDF hash plus extractor version. Boxes are empty in v1.1 until coordinate verification exists; do not highlight arbitrary rectangles. Background processing resumes pending intake on startup. Import and metadata processing never change active decisions/revision.
+
+Original review and amendment apply each use `BEGIN IMMEDIATE`, expected revision validation and one transaction for review metadata, rule history, verification attestations, decisions and commit snapshot; amendment apply also persists exactly one event. Review names are operator assertions, not authenticated identities. Known-at views select the latest committed knowledge snapshot at/before the timestamp and exclude sources acquired later; effective dates remain scheme-local dates. No historical profile-edit API exists yet.
+
+Event cursors are opaque, signed, workspace-bound and stable across service restart. The feed is append-only and paginated at 100 events; clients deduplicate by event ID. Typed `ApiError` responses cover validation, missing routes/resources, stale/blocked review, database failures and unavailable scorecards.
 
 ## 3. Canonical data structures
 
@@ -161,7 +187,7 @@ The backend must not label such a quote **verified** merely because a model supp
 
 ```json
 {
-  "schema_version": "1.0.0",
+  "schema_version": "1.1.0",
   "workspace_id": "scholarship-demo-2026",
   "revision": 0,
   "documents": [],
@@ -257,7 +283,7 @@ The scorecard reflects **measured** results from a reproducible synthetic test s
 ## 8. Contract change policy and test gates
 
 - Pydantic is authoritative. Do not change API fields in a React component without updating `backend/schemas.py` and this file.
-- Keep version `1.0.0` until implementation begins; for breaking changes use a coordinated version bump and regenerate frontend types.
+- Current version `1.1.0` adds the Phase 2 fields/routes above. For breaking changes use a coordinated version bump and regenerate frontend types.
 - Validate models with Pydantic 2, use TypeScript generated from actual OpenAPI, and add backend/frontend contract fixtures.
 - Add negative tests: no evidence; quote mismatch; reversed PDF bounds; reference mismatch; new rule unsupported; ambiguous date; stale revision; unreviewed amendment; forged-looking but *unproven* source; numeric/date mismatch in Hindi TTS; duplicate event replay.
-- HTTP/UI features listed here remain **design contracts**. Native Windows Python 3.12 schema and pure-engine tests have now run; Sarvam endpoints, PDF boxes, and live monitoring remain untested.
+- Phase 2 API, source-gate, transaction, real-PDF and local-watcher tests have run on native Windows Python 3.12. Frontend behavior, Sarvam endpoints and PDF coordinate highlights remain unimplemented/untested. See `PROGRESS.md` for exact evidence.

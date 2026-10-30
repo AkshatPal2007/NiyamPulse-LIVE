@@ -2,7 +2,7 @@
 
 > Operating instructions for coding agents and human contributors. Read this file, then `SHARED_CONTRACTS.md`, then `PROGRESS.md` **before changing code**.
 >
-> Repository status: **Phase 1 pure engine and synthetic text fixtures implemented and tested; application not yet implemented**. FastAPI, PDF intake, production source gate, frontend and Sarvam remain future work. See `PROGRESS.md` for current verification.
+> Repository status: **Phase 1 engine and Phase 2 local backend implemented and tested**. Real PDF intake, strict template parsing, source gates, explicit review, transactional apply and local watcher exist. Frontend, general notice extraction and Sarvam remain future work. See `PROGRESS.md` for verification and limitations.
 
 ## 1. Mission
 
@@ -61,14 +61,15 @@ python -m backend.schemas
 
 If activation is blocked by a PowerShell execution policy, skip activation and run commands with `.\.venv\Scripts\python.exe` directly. **Do not** change machine-wide execution policy merely for this project.
 
-**Later, after `backend/main.py` exists**, install FastAPI and launch with:
+**The Phase 2 backend now exists.** Install its dependencies, prepare the synthetic workspace, and launch with:
 
 ```powershell
-python -m pip install "fastapi>=0.115,<1" "uvicorn[standard]>=0.30,<1"
+python -m pip install -r requirements-dev.txt
+python -m backend.demo_setup
 python -m uvicorn backend.main:app --reload --port 8000
 ```
 
-These latter commands are a *future target*, not instructions that can launch the current contracts-only starter.
+See `README.md` for explicit original review and amendment application. Setup never reviews or applies documents automatically.
 
 ## 4. Repository conventions
 

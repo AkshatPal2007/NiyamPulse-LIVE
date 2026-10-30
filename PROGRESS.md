@@ -3,9 +3,9 @@
 **Last updated:** 30 October 2026  
 **Primary track:** Culture Coded (Sarvam AI)  
 **Development target:** Windows 10/11, native Python 3.12, PowerShell  
-**Current milestone:** M1 — Pure decision engine and synthetic fixtures verified; M2 next
+**Current milestone:** M2 — Local PDF backend verified; M3 frontend next
 
-**Overall status:** 🟡 **PURE ENGINE IMPLEMENTED AND TESTED; FULL APPLICATION NOT IMPLEMENTED**
+**Overall status:** 🟡 **PHASES 1–2 BACKEND IMPLEMENTED AND TESTED; FRONTEND AND SARVAM NOT IMPLEMENTED**
 
 > This ledger prevents agents from mistaking a product plan for shipped software. Update it after each meaningful code change, with the exact tests and environment used. Demo numbers are synthetic fixtures until an actual evaluation script produces them.
 
@@ -29,17 +29,17 @@
 | `SHARED_CONTRACTS.md` | ✅ Created | Endpoints, versioned payloads and trust/decision contract written |
 | `backend/schemas.py` | ✅ Created | Pydantic v2 models, validators, discriminated rule union; JSON Schema generation smoke-checked |
 | `PROGRESS.md` | ✅ Created | This coordination ledger |
-| Native Windows / Python 3.12 run | ✅ Verified | Python 3.12.10 / Pydantic 2.14.2; schemas and 37 unit/integration tests passed |
-| FastAPI server and HTTP endpoints | ⬜ Not started | Planned interfaces only |
+| Native Windows / Python 3.12 run | ✅ Verified | Python 3.12.10 / Pydantic 2.14.2; 61 tests, schema smoke and pip check passed |
+| FastAPI server and HTTP endpoints | ✅ M2 implemented | Real Uvicorn HTTP smoke and API tests; public schema 1.1.0 |
 | React frontend and UI animations | ⬜ Not started | Wireframes/spec only |
-| Document ingestion / local folder watcher | ⬜ Not started | No live monitoring claim |
+| Document ingestion / local folder watcher | ✅ M2 implemented | Actual PyMuPDF extraction; Watchdog detects stable new local corrigenda, suppresses duplicates, reports observed health; no automatic apply |
 | Sarvam API integration | ⬜ Not started | Sponsor endpoints not tested with actual credentials |
-| SourceGate + provenance controls | ⬜ Not started | Schemas exist, checks do not |
+| SourceGate + provenance controls | ✅ M2 implemented for declared template | Literal/value/date/scope checks, configured acquisition, authority/scheme/reference/chronology checks, quarantine/manual-review holds; no authenticity certification |
 | Amendment resolver / rule evaluator | ✅ M1 implemented | Five rule types, aggregation, effective windows, scoped conflicts, uncommitted ADD/REPLACE/REVOKE planning and PREVIEW impact |
-| Source-highlighting inspector | ⬜ Not started | PDF page/box integration untested |
+| Source-highlighting inspector | 🟡 Evidence API ready | Stored PDF + exact page text/quote endpoints tested; frontend and exact boxes remain unimplemented |
 | Hindi speech + numeric/date guard | ⬜ Not started | No live/cached audio created |
 | Synthetic dataset / benchmark | 🟡 Initial fixtures only | Three English/Hindi text pairs, 13 synthetic profiles and independent gold outcomes; benchmark/scorecard not implemented |
-| Demo run and offline replay | 🟡 Engine-only replay | CLI exercises actual planner/evaluator with declared synthetic text; no end-to-end PDF/API/UI product |
+| Demo run and offline replay | 🟡 Backend walkthrough ready | Synthetic PDF → extraction → gate → reviewed baseline/apply → persisted event tested; no frontend or full product replay yet |
 
 ### M1 artifacts added
 
@@ -58,7 +58,7 @@
 - Environment used for the above: **Python 3.13.5**, **Pydantic 2.13.5**, **not Windows**.
 - Do **not** treat these as a native Windows Python 3.12 compatibility certification.
 
-### Native Windows verification — 30 October 2026
+### M1 native Windows verification — 30 October 2026
 
 **VERIFIED:** native Windows, Python **3.12.10** (MSC AMD64), Pydantic **2.14.2**, using `.venv\Scripts\python.exe`.
 
@@ -81,6 +81,41 @@ py -3.12 --version
 
 **UNTESTED:** PDF parsing/OCR, production evidence and lineage gate, publication chronology, human review workflow, atomic persistence, watcher, API, frontend, Sarvam and full offline product replay. Text-file source hashes must not be described as PDF hashes. No HTTP field, enum, default or schema version changed.
 
+### M2 implementation and verification — 30 October 2026
+
+**VERIFIED:** native Windows Python **3.12.10**, Pydantic **2.14.2**, FastAPI **0.162.0**, Uvicorn **0.54.0**, PyMuPDF **1.28.2**, Watchdog **6.0.0**, python-multipart **0.0.32**, httpx **0.28.1**.
+
+- `backend/main.py`: working health/workspace/import/original-review/preview/apply/PDF/extraction/timeline/events API, explicit localhost CORS and typed errors. HTTP 202 queues extraction; it never means approval.
+- `backend/storage.py` and `backend/migrations/001_initial.sql`: SQLite bootstrap migration, immutable source/extraction/acquisition/snapshot/event records, content integrity checks, signed workspace-bound cursors and consistent read snapshots.
+- `backend/services/pdf_intake.py`, `clauses.py`, `provenance.py`: real PDF extraction, strict notice grammar, literal page offsets, evidence for condition **and effective date**, exact candidate comparison, source lineage/authority/scheme/date gates. No OCR or inferred unsupported conditions.
+- `backend/services/workspace.py`: source checks repeated within revision-checked `BEGIN IMMEDIATE` review/apply transactions. Review, rule history, decisions, snapshot and amendment event commit together or roll back together. Intake and previews never mutate active decisions.
+- `backend/services/watcher.py`: actual stable-file Watchdog intake for local **corrigenda**; no auto-apply, content hash deduplication, read retries and observed runtime health. Original notices require explicit upload/review.
+- `backend/demo_setup.py`, `backend/demo_fixtures.py`, `output/pdf/`: reproducible synthetic workspace/profiles and three actual PDFs (original, corrigendum, authority mismatch). Setup is idempotent and never imports/reviews/applies. The local `var/` data directory is ignored by Git.
+- `README.md`: manual walkthrough and run commands. `MODEL_HANDOFF.md`: copyable model context. Shared API version bumped to **1.1.0** in both schemas and contract documentation for new routes/diagnostic fields.
+
+Commands/results:
+
+```powershell
+.\.venv\Scripts\python.exe -m unittest discover -s backend/tests -v
+.\.venv\Scripts\python.exe -m backend.schemas
+.\.venv\Scripts\python.exe -m pip check
+.\.venv\Scripts\python.exe -m backend.demo_setup
+```
+
+- **61 tests passed**, including all Phase 1 tests. Negative cases cover unknown sources, supplied-URL trust spoofing, authority/scheme/reference/date mismatches, missing review, unsupported partial documents, scans, malformed PDF bytes, altered evidence/values/scope/dates, bad targets/overlaps, immutable records and stale revisions.
+- A forced event insert failure rolled back review, rules, decisions, revision and snapshot. Concurrent applies produced one winner and one 409, with one event. Restart resumed pending extraction. Cache reuse preserved document identity.
+- New regressions were written/reproduced failing for missing effective-date evidence and inconsistent multi-query reads, then passed after fixes. Initial tests failed before the Phase 2 modules existed.
+- Actual watcher test copied a new PDF, observed the measured SHA-256 and READY_TO_APPLY state, preserved FAIL until explicit apply, deduplicated a renamed copy, and verified shutdown health.
+- Full synthetic PDF/API pair reproduced the Phase 1 gold result: **5 evaluated, 2 changed (1 improved, 1 review-required), 3 unchanged**. The mismatch PDF was quarantined. These are fixture outcomes, not benchmark accuracy scores.
+- Schema import and all **39** contract-model JSON schemas passed. OpenAPI exposes actual v1.1.0 routes/models. `pip check`: no broken requirements.
+- Real Uvicorn process on loopback: health, initial revision-0 workspace, actually running local watcher, Swagger and OpenAPI passed. The smoke server was stopped; start the server manually for further interaction.
+- Three source PDFs rendered through bundled Poppler and all page PNGs visually inspected: legible, no clipped clauses. Poppler emitted missing display-font mapping warnings; rendered Helvetica text was intact. Runtime API boxes remain empty, so no exact highlighting claim is made.
+- Non-blocking dependency note: Starlette 1.10.0 warns that its httpx TestClient adapter is deprecated. The adapter works and all tests passed; no warning was hidden.
+
+**ASSUMED / scope:** only the declared notice-template grammar is parsed. Demo configuration trusts known generated PDF hashes and the operator-configured local folder; matching either is not cryptographic authenticity. Review names are local operator assertions, not authenticated identities. The demo evaluates the date 2026-10-30 in the Indian calendar; publication/acquisition chronology uses India's +05:30 date. Historical profiles are not editable through HTTP.
+
+**UNTESTED / future:** arbitrary free-form notices, Hindi PDF rendering/OCR, Sarvam, authentication/remote deployment, frontend animations/review UI, exact coordinate highlights, a 20+ pair benchmark/baseline and full product offline replay. English PDFs and Hindi Phase 1 text fixtures are tested. No scorecard or live sponsor success is claimed.
+
 ## 3. Immediate first run — native Windows PowerShell
 
 In the unpacked project root:
@@ -93,7 +128,7 @@ py -3.12 -m venv .venv
 .\.venv\Scripts\python.exe -m backend.schemas
 ```
 
-**Expected:** prints `NiyamPulse schemas v1.0.0: import OK` and the beginning of a JSON Schema. It does **not** start a server; `backend/main.py` does not yet exist.
+**Expected:** prints `NiyamPulse schemas v1.1.0: import OK` and the beginning of a JSON Schema. It does **not** start a server. The Phase 2 server now exists; use `README.md` for dependency installation, synthetic setup and launch.
 
 If PowerShell cannot find `py -3.12`, install/register Python 3.12 and rerun the version check. Do not switch to a different Python version silently.
 
@@ -120,11 +155,11 @@ If PowerShell cannot find `py -3.12`, install/register Python 3.12 and rerun the
 
 ### M2 — Intake, immutable provenance, and SourceGate
 
-- [ ] Add SQLite schema, migration/bootstrap, document hash storage, extraction snapshots.
-- [ ] Add PDF intake API and local `watchdog` folder watcher with duplicate hash suppression.
-- [ ] Add quote/evidence verification and source-reference/authority/effective-date checks.
-- [ ] Require explicit reviewed approval; quarantine mismatches; commit atomically on revision match.
-- [ ] Implement preview/apply/events/timeline HTTP endpoints with OpenAPI response models.
+- [x] Add SQLite schema, migration/bootstrap, document hash storage, extraction snapshots.
+- [x] Add PDF intake API and local `watchdog` folder watcher with duplicate hash suppression.
+- [x] Add quote/evidence verification and source-reference/authority/effective-date checks.
+- [x] Require explicit reviewed approval; quarantine mismatches; commit atomically on revision match.
+- [x] Implement preview/apply/events/timeline HTTP endpoints with OpenAPI response models.
 
 **Exit criterion:** new controlled synthetic notice triggers a real preview; only reviewed supported amendments may change committed applicant results.
 
@@ -181,8 +216,8 @@ Do **not** cut the actual rule evaluator, provenance gate, review approval, real
 | Does hackathon permit writing/submitting product code before event? | **User-supplied brief says yes; public rules not independently confirmed.** | Ask organizer for written clarification and preserve timestamped repo history. |
 | Do credited Sarvam endpoints work in this account? | **Untested** | Make one tiny structured generation call, one 1-page Vision request, one <30s Saaras request, one short Bulbul output. |
 | Can OCR yield exact quote positions for a Hindi PDF? | **Untested** | Use a 1-page Devanagari sample; compare OCR text and bounding boxes against original page rendering. |
-| Do Pydantic models work on native Windows Python 3.12? | **Verified:** Python 3.12.10 / Pydantic 2.14.2 | Schema import, all 34 model JSON schemas and 37 engine/fixture tests passed. |
-| How to prove local watcher truly detects new notices? | **Unimplemented** | Save a new file into configured directory while UI is open and record its unique content hash and event. |
+| Do Pydantic models work on native Windows Python 3.12? | **Verified:** Python 3.12.10 / Pydantic 2.14.2 | Current v1.1.0 schema import, all 39 model JSON schemas and 61 tests passed. |
+| How to prove local watcher truly detects new notices? | **Verified in native test and real-server health** | Stable copied PDF was detected with matching SHA-256 and no automatic apply; UI demonstration remains Phase 3. |
 | Does the baseline do worse than the structured engine? | **Unknown until evaluated** | Run both on the same labeled synthetic cases; never predict a score. |
 
 ## 7. Risks / limitations to keep visible
@@ -200,5 +235,6 @@ Do **not** cut the actual rule evaluator, provenance gate, review approval, real
 |---|---|---|---|
 | 2026-10-30 | Initial four-file contract scaffold | Pydantic import and JSON Schema generation in Python 3.13.5/Linux; Windows 3.12 pending | M0 Windows run, then M1 pure rules + gold fixtures |
 | 2026-10-30 | Verified M0; implemented M1 evaluator, uncommitted amendment planner, PREVIEW impact, strict synthetic text parser, 3 pairs/13 profiles, tests and local tooling | Native Windows Python 3.12.10 / Pydantic 2.14.2; `python -m backend.schemas`; `python -m unittest discover -s backend/tests -v`: 37 passed; `python -m backend.synthetic_demo`: 3 pairs matched gold; maximum-date regression reproduced then fixed | M2 PDF intake, immutable extraction/source gate, review and transactional API |
+| 2026-10-30 | Implemented M2 PDF/SQLite/source-gate/review/apply API, actual local watcher, v1.1.0 contracts, synthetic PDFs, walkthrough and model handoff | Native Windows Python 3.12.10: 61 tests passed; 39 JSON schemas; pip check; real Uvicorn HTTP smoke; Poppler visual inspection; rollback/concurrency/read-snapshot regressions verified | M3 real API-driven frontend |
 
-**Next owner task:** M2 — add actual PDF intake/extraction, immutable storage, source/evidence verification, explicit human review and atomic revision-checked API application. The current engine-only CLI needs no credentials or further manual setup.
+**Next owner task:** M3 frontend — generate TypeScript from actual OpenAPI 1.1.0, connect review/source inspection and four-status profiles to real API data, poll/deduplicate events and animate actual transitions. No Sarvam credentials are needed yet. Manual backend review steps are in `README.md`.

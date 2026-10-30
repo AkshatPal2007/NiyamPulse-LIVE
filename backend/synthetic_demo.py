@@ -12,7 +12,6 @@ from datetime import date, datetime
 import hashlib
 import json
 from pathlib import Path
-import re
 
 from pydantic import TypeAdapter
 
@@ -28,31 +27,9 @@ _RULE = TypeAdapter(RuleDefinition)
 
 
 def parse_synthetic_clause(text: str, language: str) -> dict:
-    """Parse exact fixture grammar, rejecting all other free-form notice text."""
-    grammars = {
-        "en": [
-            (r"Minimum qualifying marks: ([0-9]+(?:\.[0-9]+)?)%\.", "minimum_marks", ("min_marks_percent",)),
-            (r"Maximum annual household income: INR ([0-9]+)\.", "maximum_income_inr", ("max_annual_income_inr",)),
-            (r"Application deadline: ([0-9]{4}-[0-9]{2}-[0-9]{2})\.", "application_deadline", ("deadline_on",)),
-            (r"Age bounds: ([0-9]+)\.\.([0-9]+) years on ([0-9]{4}-[0-9]{2}-[0-9]{2})\.", "age_bounds", ("min_age_years", "max_age_years", "age_as_of")),
-            (r"Required documents: ([A-Za-z0-9_, .:-]+)\.", "required_documents", ("required_document_codes",)),
-        ],
-        "hi": [
-            (r"न्यूनतम अंक: ([0-9]+(?:\.[0-9]+)?)%।", "minimum_marks", ("min_marks_percent",)),
-            (r"अधिकतम वार्षिक पारिवारिक आय: INR ([0-9]+)।", "maximum_income_inr", ("max_annual_income_inr",)),
-            (r"आवेदन की अंतिम तिथि: ([0-9]{4}-[0-9]{2}-[0-9]{2})।", "application_deadline", ("deadline_on",)),
-            (r"आयु सीमा: ([0-9]+)\.\.([0-9]+) वर्ष; आधार तिथि: ([0-9]{4}-[0-9]{2}-[0-9]{2})।", "age_bounds", ("min_age_years", "max_age_years", "age_as_of")),
-            (r"आवश्यक दस्तावेज़: ([A-Za-z0-9_, .:-]+)।", "required_documents", ("required_document_codes",)),
-        ],
-    }
-    for pattern, rule_type, names in grammars.get(language, []):
-        match = re.fullmatch(pattern, text)
-        if match:
-            fields = dict(zip(names, match.groups()))
-            if rule_type == "required_documents":
-                fields["required_document_codes"] = [code.strip() for code in fields["required_document_codes"].split(",")]
-            return {"rule_type": rule_type, **fields}
-    raise ValueError("Unsupported synthetic clause; no rules inferred")
+    """Fixture compatibility wrapper around the shared closed clause parser."""
+    from backend.services.clauses import parse_closed_clause
+    return parse_closed_clause(text, language)
 
 
 @dataclass(frozen=True)

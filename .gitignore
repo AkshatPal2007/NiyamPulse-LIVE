@@ -11,3 +11,9 @@ node_modules/
 dist/
 *.sqlite
 *.sqlite3
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite3-wal
+*.sqlite3-shm
+var/
+tmp/

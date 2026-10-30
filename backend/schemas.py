@@ -17,7 +17,7 @@ from typing import Annotated, Literal, TypeAlias
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, HttpUrl, model_validator
 
-SCHEMA_VERSION = "1.0.0"
+SCHEMA_VERSION = "1.1.0"
 DISCLAIMER = "Decision support only; not official approval."
 
 
@@ -161,6 +161,15 @@ class SourceDocument(ContractModel):
     reference_number: str | None = None
     extraction_state: ExtractionState = ExtractionState.PENDING
     extraction_id: Id | None = None
+    intake_state: IntakeState = IntakeState.RECEIVED
+    acquisition_channel: Literal["UPLOAD", "LOCAL_WATCH"] = "UPLOAD"
+    processing_mode: Literal["LOCAL_PDF", "CACHED_EXTRACTION"] = "LOCAL_PDF"
+    synthetic: bool = False
+    diagnostics: list[str] = Field(default_factory=list)
+    source_gate: SourceGateResult | None = None
+    review_state: ReviewState = ReviewState.PENDING
+    reviewed_by: str | None = None
+    reviewed_at: AwareDatetime | None = None
 
 
 class RuleBase(ContractModel):
@@ -427,7 +436,7 @@ class VerifiedExplanation(ContractModel):
 
 
 class WorkspaceState(ContractModel):
-    schema_version: Literal["1.0.0"] = SCHEMA_VERSION
+    schema_version: Literal["1.1.0"] = SCHEMA_VERSION
     workspace_id: Id
     revision: int = Field(ge=0)
     documents: list[SourceDocument] = Field(default_factory=list)
@@ -436,10 +445,14 @@ class WorkspaceState(ContractModel):
     profiles: list[ApplicantProfile] = Field(default_factory=list)
     decisions: list[ApplicantDecision] = Field(default_factory=list)
     latest_event: ImpactEvent | None = None
+    scheme_id: Id | None = None
+    as_of_date: date | None = None
+    synthetic: bool = False
+    watcher: WatcherHealth = Field(default_factory=lambda: WatcherHealth())
 
 
 class TimelineSnapshot(ContractModel):
-    schema_version: Literal["1.0.0"] = SCHEMA_VERSION
+    schema_version: Literal["1.1.0"] = SCHEMA_VERSION
     workspace_id: Id
     as_of_date: date
     # When provided, exclude documents not known by this timestamp.
@@ -450,7 +463,7 @@ class TimelineSnapshot(ContractModel):
 
 
 class EventFeedResponse(ContractModel):
-    schema_version: Literal["1.0.0"] = SCHEMA_VERSION
+    schema_version: Literal["1.1.0"] = SCHEMA_VERSION
     workspace_id: Id
     events: list[ImpactEvent] = Field(default_factory=list)
     next_cursor: str | None = None
@@ -477,7 +490,7 @@ class EvaluationMetric(ContractModel):
 
 
 class EvaluationScorecard(ContractModel):
-    schema_version: Literal["1.0.0"] = SCHEMA_VERSION
+    schema_version: Literal["1.1.0"] = SCHEMA_VERSION
     run_id: Id
     dataset_id: Id
     synthetic: Literal[True] = True
@@ -495,7 +508,7 @@ class ApplyAmendmentRequest(ContractModel):
 
 
 class PreviewAmendmentResponse(ContractModel):
-    schema_version: Literal["1.0.0"] = SCHEMA_VERSION
+    schema_version: Literal["1.1.0"] = SCHEMA_VERSION
     amendment: AmendmentRecord
     impact: ImpactEvent | None = None
     can_apply: bool
@@ -503,19 +516,19 @@ class PreviewAmendmentResponse(ContractModel):
 
 
 class ApplyAmendmentResponse(ContractModel):
-    schema_version: Literal["1.0.0"] = SCHEMA_VERSION
+    schema_version: Literal["1.1.0"] = SCHEMA_VERSION
     workspace_revision: int = Field(ge=0)
     event: ImpactEvent
 
 
 class ImportDocumentResponse(ContractModel):
-    schema_version: Literal["1.0.0"] = SCHEMA_VERSION
+    schema_version: Literal["1.1.0"] = SCHEMA_VERSION
     document: SourceDocument
     amendment_id: Id | None = None
 
 
 class TranscriptResponse(ContractModel):
-    schema_version: Literal["1.0.0"] = SCHEMA_VERSION
+    schema_version: Literal["1.1.0"] = SCHEMA_VERSION
     language: str
     transcript: str
     provider: Literal["sarvam_saaras_v4", "offline_demo"]
@@ -526,6 +539,40 @@ class ApiError(ContractModel):
     message: NonEmpty
     request_id: Id | None = None
     details: dict[str, str] = Field(default_factory=dict)
+
+
+class HealthResponse(ContractModel):
+    status: Literal["ok"] = "ok"
+    schema_version: Literal["1.1.0"] = SCHEMA_VERSION
+
+
+class WatcherHealth(ContractModel):
+    enabled: bool = False
+    running: bool = False
+    watched_directory: str | None = None
+    last_scan_at: AwareDatetime | None = None
+    last_error: str | None = None
+
+
+class ExtractedPage(ContractModel):
+    # Frozen extraction text must retain newlines and incidental whitespace.
+    model_config = ConfigDict(extra="forbid", frozen=True, str_strip_whitespace=False)
+    page_number: int = Field(ge=1)
+    text: str
+    width: float = Field(gt=0)
+    height: float = Field(gt=0)
+
+
+class DocumentExtraction(ContractModel):
+    document_id: Id
+    document_sha256: Sha256
+    extraction_id: Id
+    extractor_version: NonEmpty
+    pages: list[ExtractedPage] = Field(min_length=1)
+
+
+class ReviewOriginalRequest(ApplyAmendmentRequest):
+    """Explicitly review a verified original; bootstrap only an empty rule history."""
 
 
 if __name__ == "__main__":

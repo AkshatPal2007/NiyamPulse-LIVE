@@ -2,7 +2,7 @@
 
 > Operating instructions for coding agents and human contributors. Read this file, then `SHARED_CONTRACTS.md`, then `PROGRESS.md` **before changing code**.
 >
-> Repository status: **contracts-only bootstrap**. Do not describe the app as implemented or working until its code and tests exist.
+> Repository status: **Phase 1 pure engine and synthetic text fixtures implemented and tested; application not yet implemented**. FastAPI, PDF intake, production source gate, frontend and Sarvam remain future work. See `PROGRESS.md` for current verification.
 
 ## 1. Mission
 

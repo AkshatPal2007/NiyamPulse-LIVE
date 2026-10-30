@@ -3,8 +3,9 @@
 **Last updated:** 30 October 2026  
 **Primary track:** Culture Coded (Sarvam AI)  
 **Development target:** Windows 10/11, native Python 3.12, PowerShell  
-**Current milestone:** M0 — Contracts and project coordination  
-**Overall status:** 🟡 **SPECIFIED, NOT IMPLEMENTED**
+**Current milestone:** M1 — Pure decision engine and synthetic fixtures verified; M2 next
+
+**Overall status:** 🟡 **PURE ENGINE IMPLEMENTED AND TESTED; FULL APPLICATION NOT IMPLEMENTED**
 
 > This ledger prevents agents from mistaking a product plan for shipped software. Update it after each meaningful code change, with the exact tests and environment used. Demo numbers are synthetic fixtures until an actual evaluation script produces them.
 
@@ -28,17 +29,27 @@
 | `SHARED_CONTRACTS.md` | ✅ Created | Endpoints, versioned payloads and trust/decision contract written |
 | `backend/schemas.py` | ✅ Created | Pydantic v2 models, validators, discriminated rule union; JSON Schema generation smoke-checked |
 | `PROGRESS.md` | ✅ Created | This coordination ledger |
-| Native Windows / Python 3.12 run | ⬜ Not tested | Must be run locally |
+| Native Windows / Python 3.12 run | ✅ Verified | Python 3.12.10 / Pydantic 2.14.2; schemas and 37 unit/integration tests passed |
 | FastAPI server and HTTP endpoints | ⬜ Not started | Planned interfaces only |
 | React frontend and UI animations | ⬜ Not started | Wireframes/spec only |
 | Document ingestion / local folder watcher | ⬜ Not started | No live monitoring claim |
 | Sarvam API integration | ⬜ Not started | Sponsor endpoints not tested with actual credentials |
 | SourceGate + provenance controls | ⬜ Not started | Schemas exist, checks do not |
-| Amendment resolver / rule evaluator | ⬜ Not started | Must be pure deterministic code |
+| Amendment resolver / rule evaluator | ✅ M1 implemented | Five rule types, aggregation, effective windows, scoped conflicts, uncommitted ADD/REPLACE/REVOKE planning and PREVIEW impact |
 | Source-highlighting inspector | ⬜ Not started | PDF page/box integration untested |
 | Hindi speech + numeric/date guard | ⬜ Not started | No live/cached audio created |
-| Synthetic dataset / benchmark | ⬜ Not started | No accuracy numbers may be claimed |
-| Demo run and offline replay | ⬜ Not started | No end-to-end product currently exists |
+| Synthetic dataset / benchmark | 🟡 Initial fixtures only | Three English/Hindi text pairs, 13 synthetic profiles and independent gold outcomes; benchmark/scorecard not implemented |
+| Demo run and offline replay | 🟡 Engine-only replay | CLI exercises actual planner/evaluator with declared synthetic text; no end-to-end PDF/API/UI product |
+
+### M1 artifacts added
+
+- `backend/services/rule_engine.py`: deterministic rule checks, reason codes, aggregation, canonical content hashes and fail-closed verification inputs.
+- `backend/services/amendments.py`: pure, uncommitted plans preserving unrelated rule history and rejecting ambiguous/incompatible/overlapping changes.
+- `backend/services/impact.py`: backend-owned PREVIEW transitions/counts; never claims a committed apply.
+- `backend/services/README.md`: trust boundary, function usage, verified behavior and assumed demo conventions.
+- `backend/synthetic_demo.py` and `datasets/synthetic/phase1/`: strict fixture-only English/Hindi clause parser, measured text hashes/anchors, three pairs and 13 synthetic applicants.
+- `backend/tests/`: 37 tests using standard-library unittest; no extra test dependency.
+- `requirements.txt` and `.gitignore`: Pydantic v2 dependency range and exclusions for environments, credentials and generated caches. Previously tracked bytecode removed from version control.
 
 ### Local tooling check performed on this starter
 
@@ -46,6 +57,29 @@
 - Pydantic JSON Schema generation for the main models: **passed** in the artifact-building environment.
 - Environment used for the above: **Python 3.13.5**, **Pydantic 2.13.5**, **not Windows**.
 - Do **not** treat these as a native Windows Python 3.12 compatibility certification.
+
+### Native Windows verification — 30 October 2026
+
+**VERIFIED:** native Windows, Python **3.12.10** (MSC AMD64), Pydantic **2.14.2**, using `.venv\Scripts\python.exe`.
+
+```powershell
+py -3.12 --version
+.\.venv\Scripts\python.exe -m backend.schemas
+.\.venv\Scripts\python.exe -m unittest discover -s backend/tests -v
+.\.venv\Scripts\python.exe -m backend.synthetic_demo
+```
+
+- Schema smoke check: **passed**. JSON schemas generated successfully for all **34** Pydantic contract models.
+- Test discovery: **37 passed**. Tests first failed on absent implementations; a maximum-date overlap regression was separately reproduced as a failing assertion and passed after the fix.
+- Fixture replay: **passed** for all three pairs, matching independently authored gold outcomes across **13** synthetic profiles. Gold labels do not drive predictions.
+- Marks relaxation: 5 evaluated, 2 changed (1 improved, 1 review-required), 3 unchanged.
+- Hindi income tightening: 4 evaluated, 1 changed (1 worsened), 3 unchanged.
+- Document expansion: 4 evaluated, 2 changed (1 worsened, 1 review-required), 2 unchanged.
+- These are actual test-fixture results, **not** benchmark accuracy scores, official scholarship approvals or live-source processing.
+
+**ASSUMED:** fixture target maps/effective dates and trust are curated test inputs. The engine accepts content-bound upstream attestations, not an evidence-presence shortcut. February 29 age handling and conservative scope-overlap policy are documented in `backend/services/README.md`.
+
+**UNTESTED:** PDF parsing/OCR, production evidence and lineage gate, publication chronology, human review workflow, atomic persistence, watcher, API, frontend, Sarvam and full offline product replay. Text-file source hashes must not be described as PDF hashes. No HTTP field, enum, default or schema version changed.
 
 ## 3. Immediate first run — native Windows PowerShell
 
@@ -70,17 +104,17 @@ If PowerShell cannot find `py -3.12`, install/register Python 3.12 and rerun the
 - [x] Document single coherent product story, trust boundaries and v1 scope.
 - [x] Define typed rule, evidence, amendment, gate, profile, event, explanation and evaluation DTOs.
 - [x] Freeze a planned `/api/v1` handshake and DTO naming.
-- [ ] Confirm on native Windows Python 3.12 and add an automated unit test command.
+- [x] Confirm on native Windows Python 3.12 and add an automated unit test command.
 
 **Exit criterion:** clean import + schema build on Windows Python 3.12; team agrees that fields/endpoint names are stable.
 
 ### M1 — Pure decision engine and synthetic fixtures
 
-- [ ] Implement deterministic evaluators for five closed rule types.
-- [ ] Implement aggregate precedence and four statuses with explainable reason codes.
-- [ ] Implement effective intervals, targeted `ADD/REPLACE/REVOKE`, scope matching and conflict detection.
-- [ ] Build initial synthetic personas and at least three original/corrigendum fixtures (English and Hindi).
-- [ ] Unit-test FAIL→PASS, PASS→FAIL, UNKNOWN, CONFLICT, and unrelated amendment preservation.
+- [x] Implement deterministic evaluators for five closed rule types.
+- [x] Implement aggregate precedence and four statuses with explainable reason codes.
+- [x] Implement effective intervals, targeted `ADD/REPLACE/REVOKE`, scope matching and conflict detection.
+- [x] Build initial synthetic personas and at least three original/corrigendum fixtures (English and Hindi; UTF-8 text, not PDFs).
+- [x] Unit-test FAIL→PASS, PASS→FAIL, UNKNOWN, CONFLICT, and unrelated amendment preservation.
 
 **Exit criterion:** Python-only tests reproduce golden profile outcomes with no LLM or network dependency.
 
@@ -147,7 +181,7 @@ Do **not** cut the actual rule evaluator, provenance gate, review approval, real
 | Does hackathon permit writing/submitting product code before event? | **User-supplied brief says yes; public rules not independently confirmed.** | Ask organizer for written clarification and preserve timestamped repo history. |
 | Do credited Sarvam endpoints work in this account? | **Untested** | Make one tiny structured generation call, one 1-page Vision request, one <30s Saaras request, one short Bulbul output. |
 | Can OCR yield exact quote positions for a Hindi PDF? | **Untested** | Use a 1-page Devanagari sample; compare OCR text and bounding boxes against original page rendering. |
-| Do Pydantic models work on native Windows Python 3.12? | **Untested here** | Run the M0 PowerShell commands and record versions/output. |
+| Do Pydantic models work on native Windows Python 3.12? | **Verified:** Python 3.12.10 / Pydantic 2.14.2 | Schema import, all 34 model JSON schemas and 37 engine/fixture tests passed. |
 | How to prove local watcher truly detects new notices? | **Unimplemented** | Save a new file into configured directory while UI is open and record its unique content hash and event. |
 | Does the baseline do worse than the structured engine? | **Unknown until evaluated** | Run both on the same labeled synthetic cases; never predict a score. |
 
@@ -165,5 +199,6 @@ Do **not** cut the actual rule evaluator, provenance gate, review approval, real
 | Date | Work | Tests / evidence | Next step |
 |---|---|---|---|
 | 2026-10-30 | Initial four-file contract scaffold | Pydantic import and JSON Schema generation in Python 3.13.5/Linux; Windows 3.12 pending | M0 Windows run, then M1 pure rules + gold fixtures |
+| 2026-10-30 | Verified M0; implemented M1 evaluator, uncommitted amendment planner, PREVIEW impact, strict synthetic text parser, 3 pairs/13 profiles, tests and local tooling | Native Windows Python 3.12.10 / Pydantic 2.14.2; `python -m backend.schemas`; `python -m unittest discover -s backend/tests -v`: 37 passed; `python -m backend.synthetic_demo`: 3 pairs matched gold; maximum-date regression reproduced then fixed | M2 PDF intake, immutable extraction/source gate, review and transactional API |
 
-**Next owner task:** Run the local Windows Python 3.12 smoke check, then build `backend/services/rule_engine.py` and its deterministic unit tests before creating visual effects.
+**Next owner task:** M2 — add actual PDF intake/extraction, immutable storage, source/evidence verification, explicit human review and atomic revision-checked API application. The current engine-only CLI needs no credentials or further manual setup.

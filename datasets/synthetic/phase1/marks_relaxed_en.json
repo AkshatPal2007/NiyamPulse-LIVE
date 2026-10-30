@@ -1,0 +1,39 @@
+{
+  "synthetic": true,
+  "source_format": "utf8_text_not_pdf",
+  "case_id": "marks-relaxed-en",
+  "language": "en",
+  "workspace_id": "workspace-demo",
+  "scheme_id": "demo",
+  "as_of_date": "2026-10-30",
+  "occurred_at": "2026-10-30T10:00:00Z",
+  "documents": {"marks-original": "marks_original_en.txt", "marks-corrigendum": "marks_corrigendum_en.txt"},
+  "original_rules": [
+    {"rule_id": "marks-v1", "document_id": "marks-original", "clause_line": 2, "effective_from": "2026-10-01"},
+    {"rule_id": "income-v1", "document_id": "marks-original", "clause_line": 3, "effective_from": "2026-10-01"},
+    {"rule_id": "deadline-v1", "document_id": "marks-original", "clause_line": 4, "effective_from": "2026-10-01"},
+    {"rule_id": "age-v1", "document_id": "marks-original", "clause_line": 5, "effective_from": "2026-10-01"},
+    {"rule_id": "documents-v1", "document_id": "marks-original", "clause_line": 6, "effective_from": "2026-10-01"}
+  ],
+  "changes": [
+    {"change_id": "relax-marks", "operation": "REPLACE", "target_rule_id": "marks-v1", "effective_from": "2026-10-15",
+     "proposed_rule": {"rule_id": "marks-v2", "document_id": "marks-corrigendum", "clause_line": 2, "effective_from": "2026-10-15"}}
+  ],
+  "profiles": [
+    {"applicant_id": "synthetic-m01", "workspace_id": "workspace-demo", "display_name": "Synthetic Applicant M01", "marks_percent": 65, "annual_household_income_inr": 200000, "date_of_birth": "2006-10-30", "planned_submission_on": "2026-10-30", "available_document_codes": ["ID", "INCOME"], "document_inventory_complete": true, "updated_at": "2026-10-30T00:00:00Z"},
+    {"applicant_id": "synthetic-m02", "workspace_id": "workspace-demo", "display_name": "Synthetic Applicant M02", "marks_percent": 80, "annual_household_income_inr": 200000, "date_of_birth": "2006-10-30", "planned_submission_on": "2026-10-30", "available_document_codes": ["ID", "INCOME"], "document_inventory_complete": true, "updated_at": "2026-10-30T00:00:00Z"},
+    {"applicant_id": "synthetic-m03", "workspace_id": "workspace-demo", "display_name": "Synthetic Applicant M03", "marks_percent": null, "annual_household_income_inr": 200000, "date_of_birth": "2006-10-30", "planned_submission_on": "2026-10-30", "available_document_codes": ["ID", "INCOME"], "document_inventory_complete": true, "updated_at": "2026-10-30T00:00:00Z"},
+    {"applicant_id": "synthetic-m04", "workspace_id": "workspace-demo", "display_name": "Synthetic Applicant M04", "marks_percent": 65, "annual_household_income_inr": 300001, "date_of_birth": "2006-10-30", "planned_submission_on": "2026-10-30", "available_document_codes": ["ID", "INCOME"], "document_inventory_complete": true, "updated_at": "2026-10-30T00:00:00Z"},
+    {"applicant_id": "synthetic-m05", "workspace_id": "workspace-demo", "display_name": "Synthetic Applicant M05", "marks_percent": 65, "annual_household_income_inr": null, "date_of_birth": "2006-10-30", "planned_submission_on": "2026-10-30", "available_document_codes": ["ID", "INCOME"], "document_inventory_complete": true, "updated_at": "2026-10-30T00:00:00Z"}
+  ],
+  "gold": {
+    "counts": {"evaluated": 5, "changed": 2, "improved": 1, "worsened": 0, "review_required": 1, "unchanged": 3},
+    "transitions": {
+      "synthetic-m01": ["FAIL", "PASS", "IMPROVED"],
+      "synthetic-m02": ["PASS", "PASS", "UNCHANGED"],
+      "synthetic-m03": ["UNKNOWN", "UNKNOWN", "UNCHANGED"],
+      "synthetic-m04": ["FAIL", "FAIL", "UNCHANGED"],
+      "synthetic-m05": ["FAIL", "UNKNOWN", "REVIEW_REQUIRED"]
+    }
+  }
+}

@@ -6,6 +6,8 @@
 **Target runtime:** Python 3.12 (native Windows), FastAPI; React + TypeScript + Vite frontend  
 **Status:** **SPECIFIED ONLY** — HTTP endpoints and frontend are **not implemented** in this starter.
 
+**Phase 1 implementation note (2026-10-30):** Pure Python evaluator, uncommitted amendment planner and PREVIEW impact calculation now exist under `backend/services/`, using the unchanged v1 DTOs. Native Windows Python 3.12 schema and engine tests have passed. The fixture-only text parser is not PDF ingestion or a production source gate. See `backend/services/README.md` for the internal trust boundary and declared demo conventions. HTTP endpoints remain planned.
+
 > This is the cross-team agreement. The frontend may animate data received from the backend, but may not calculate eligibility, infer source trust, invent impact counts, or alter effective rules.
 
 ## 1. Transport and conventions
@@ -258,4 +260,4 @@ The scorecard reflects **measured** results from a reproducible synthetic test s
 - Keep version `1.0.0` until implementation begins; for breaking changes use a coordinated version bump and regenerate frontend types.
 - Validate models with Pydantic 2, use TypeScript generated from actual OpenAPI, and add backend/frontend contract fixtures.
 - Add negative tests: no evidence; quote mismatch; reversed PDF bounds; reference mismatch; new rule unsupported; ambiguous date; stale revision; unreviewed amendment; forged-looking but *unproven* source; numeric/date mismatch in Hindi TTS; duplicate event replay.
-- All features initially listed here are **design contracts**. Tests of Windows 3.12, all Sarvam endpoints, PDF boxes, and live monitoring have **not yet been performed** in this starter.
+- HTTP/UI features listed here remain **design contracts**. Native Windows Python 3.12 schema and pure-engine tests have now run; Sarvam endpoints, PDF boxes, and live monitoring remain untested.

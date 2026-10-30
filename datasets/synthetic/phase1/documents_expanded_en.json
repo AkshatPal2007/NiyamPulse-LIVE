@@ -1,0 +1,34 @@
+{
+  "synthetic": true,
+  "source_format": "utf8_text_not_pdf",
+  "case_id": "documents-expanded-en",
+  "language": "en",
+  "workspace_id": "workspace-demo",
+  "scheme_id": "demo",
+  "as_of_date": "2026-10-30",
+  "occurred_at": "2026-10-30T10:00:00Z",
+  "documents": {"documents-original": "documents_original_en.txt", "documents-corrigendum": "documents_corrigendum_en.txt"},
+  "original_rules": [
+    {"rule_id": "marks-v1", "document_id": "documents-original", "clause_line": 2, "effective_from": "2026-10-01"},
+    {"rule_id": "documents-v1", "document_id": "documents-original", "clause_line": 3, "effective_from": "2026-10-01"}
+  ],
+  "changes": [
+    {"change_id": "expand-documents", "operation": "REPLACE", "target_rule_id": "documents-v1", "effective_from": "2026-10-15",
+     "proposed_rule": {"rule_id": "documents-v2", "document_id": "documents-corrigendum", "clause_line": 2, "effective_from": "2026-10-15"}}
+  ],
+  "profiles": [
+    {"applicant_id": "synthetic-d01", "workspace_id": "workspace-demo", "display_name": "Synthetic Applicant D01", "marks_percent": 75, "available_document_codes": ["ID"], "document_inventory_complete": true, "updated_at": "2026-10-30T00:00:00Z"},
+    {"applicant_id": "synthetic-d02", "workspace_id": "workspace-demo", "display_name": "Synthetic Applicant D02", "marks_percent": 75, "available_document_codes": ["ID"], "document_inventory_complete": false, "updated_at": "2026-10-30T00:00:00Z"},
+    {"applicant_id": "synthetic-d03", "workspace_id": "workspace-demo", "display_name": "Synthetic Applicant D03", "marks_percent": 75, "available_document_codes": ["ID", "INCOME"], "document_inventory_complete": true, "updated_at": "2026-10-30T00:00:00Z"},
+    {"applicant_id": "synthetic-d04", "workspace_id": "workspace-demo", "display_name": "Synthetic Applicant D04", "marks_percent": 60, "available_document_codes": ["ID"], "document_inventory_complete": true, "updated_at": "2026-10-30T00:00:00Z"}
+  ],
+  "gold": {
+    "counts": {"evaluated": 4, "changed": 2, "improved": 0, "worsened": 1, "review_required": 1, "unchanged": 2},
+    "transitions": {
+      "synthetic-d01": ["PASS", "FAIL", "WORSENED"],
+      "synthetic-d02": ["PASS", "UNKNOWN", "REVIEW_REQUIRED"],
+      "synthetic-d03": ["PASS", "PASS", "UNCHANGED"],
+      "synthetic-d04": ["FAIL", "FAIL", "UNCHANGED"]
+    }
+  }
+}

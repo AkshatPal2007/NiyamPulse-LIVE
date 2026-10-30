@@ -14,7 +14,7 @@ import json
 
 from pydantic import TypeAdapter
 
-from backend.schemas import (
+from backend.legacy_schemas_v1 import (
     ApplicantDecision, ApplicantProfile, DecisionStatus, RuleCheck,
     RuleDefinition, RuleType,
 )

@@ -7,7 +7,7 @@ import time
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 
-from backend.schemas import WatcherHealth
+from backend.legacy_schemas_v1 import WatcherHealth
 from backend.services.pdf_intake import MAX_PDF_BYTES
 from backend.storage import ServiceError
 

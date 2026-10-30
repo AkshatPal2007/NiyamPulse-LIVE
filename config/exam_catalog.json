@@ -1,0 +1,286 @@
+{
+  "schema_version": "2.0.0",
+  "description": "Starter multi-exam catalog; not a claim of active monitoring or open registration",
+  "exams": [
+    {
+      "exam_id": "jee-main",
+      "display_name": "JEE Main",
+      "exam_family": "SCHOOL_ENTRANCE",
+      "audiences": [
+        "SCHOOL"
+      ],
+      "organizer": "National Testing Agency",
+      "description": "Engineering entrance",
+      "active": true,
+      "source_ids": [
+        "nta-jee-main"
+      ]
+    },
+    {
+      "exam_id": "neet-ug",
+      "display_name": "NEET UG",
+      "exam_family": "SCHOOL_ENTRANCE",
+      "audiences": [
+        "SCHOOL"
+      ],
+      "organizer": "National Testing Agency",
+      "description": "Medical undergraduate entrance",
+      "active": true,
+      "source_ids": [
+        "nta-neet-ug"
+      ]
+    },
+    {
+      "exam_id": "nda-na",
+      "display_name": "NDA / Naval Academy",
+      "exam_family": "DEFENCE_ENTRANCE",
+      "audiences": [
+        "SCHOOL"
+      ],
+      "organizer": "Union Public Service Commission",
+      "description": "Defence entry examinations; personal age and other criteria need official review",
+      "active": true,
+      "source_ids": [
+        "upsc-active"
+      ]
+    },
+    {
+      "exam_id": "gate",
+      "display_name": "GATE",
+      "exam_family": "ENGINEERING_POSTGRAD",
+      "audiences": [
+        "ENGINEERING"
+      ],
+      "organizer": "GATE organizing institute (cycle-specific)",
+      "description": "Engineering and other subject postgraduate test; organizing institute changes by year",
+      "active": true,
+      "source_ids": [
+        "gate-2027"
+      ]
+    },
+    {
+      "exam_id": "upsc-ese",
+      "display_name": "UPSC Engineering Services (ESE)",
+      "exam_family": "GOVERNMENT_RECRUITMENT",
+      "audiences": [
+        "ENGINEERING"
+      ],
+      "organizer": "Union Public Service Commission",
+      "description": "Engineering Services recruitment examination",
+      "active": true,
+      "source_ids": [
+        "upsc-active"
+      ]
+    },
+    {
+      "exam_id": "ssc-je",
+      "display_name": "SSC Junior Engineer (JE)",
+      "exam_family": "GOVERNMENT_RECRUITMENT",
+      "audiences": [
+        "ENGINEERING"
+      ],
+      "organizer": "Staff Selection Commission",
+      "description": "Junior Engineer recruitment",
+      "active": true,
+      "source_ids": [
+        "ssc-board"
+      ]
+    },
+    {
+      "exam_id": "ssc-cgl",
+      "display_name": "SSC CGL",
+      "exam_family": "GOVERNMENT_RECRUITMENT",
+      "audiences": [
+        "GENERAL",
+        "ENGINEERING"
+      ],
+      "organizer": "Staff Selection Commission",
+      "description": "Graduate level recruitment",
+      "active": true,
+      "source_ids": [
+        "ssc-board"
+      ]
+    },
+    {
+      "exam_id": "ssc-chsl",
+      "display_name": "SSC CHSL",
+      "exam_family": "GOVERNMENT_RECRUITMENT",
+      "audiences": [
+        "SCHOOL",
+        "GENERAL"
+      ],
+      "organizer": "Staff Selection Commission",
+      "description": "Higher secondary level recruitment",
+      "active": true,
+      "source_ids": [
+        "ssc-board"
+      ]
+    },
+    {
+      "exam_id": "jee-advanced",
+      "display_name": "JEE Advanced",
+      "exam_family": "SCHOOL_ENTRANCE",
+      "audiences": [
+        "SCHOOL"
+      ],
+      "organizer": "Year-specific organizing IIT (verify)",
+      "description": "Catalog-only; specific official source adapter pending",
+      "active": false,
+      "source_ids": []
+    },
+    {
+      "exam_id": "cuet-ug",
+      "display_name": "CUET UG",
+      "exam_family": "SCHOOL_ENTRANCE",
+      "audiences": [
+        "SCHOOL"
+      ],
+      "organizer": "National Testing Agency",
+      "description": "Catalog-only; source adapter pending",
+      "active": false,
+      "source_ids": []
+    },
+    {
+      "exam_id": "bitsat",
+      "display_name": "BITSAT",
+      "exam_family": "SCHOOL_ENTRANCE",
+      "audiences": [
+        "SCHOOL"
+      ],
+      "organizer": "BITS Pilani",
+      "description": "Catalog-only; official source validation pending",
+      "active": false,
+      "source_ids": []
+    },
+    {
+      "exam_id": "viteee",
+      "display_name": "VITEEE",
+      "exam_family": "SCHOOL_ENTRANCE",
+      "audiences": [
+        "SCHOOL"
+      ],
+      "organizer": "VIT",
+      "description": "Catalog-only; official source validation pending",
+      "active": false,
+      "source_ids": []
+    },
+    {
+      "exam_id": "rrb-je",
+      "display_name": "RRB Junior Engineer",
+      "exam_family": "GOVERNMENT_RECRUITMENT",
+      "audiences": [
+        "ENGINEERING"
+      ],
+      "organizer": "Railway Recruitment Boards",
+      "description": "Catalog-only; region-specific notices need adapter mapping",
+      "active": false,
+      "source_ids": []
+    },
+    {
+      "exam_id": "isro-engineer",
+      "display_name": "ISRO Scientist / Engineer recruitment",
+      "exam_family": "GOVERNMENT_RECRUITMENT",
+      "audiences": [
+        "ENGINEERING"
+      ],
+      "organizer": "ISRO",
+      "description": "Catalog-only; recruitment notices vary by vacancy",
+      "active": false,
+      "source_ids": []
+    },
+    {
+      "exam_id": "drdo-scientist",
+      "display_name": "DRDO Scientist B / RAC",
+      "exam_family": "GOVERNMENT_RECRUITMENT",
+      "audiences": [
+        "ENGINEERING"
+      ],
+      "organizer": "DRDO / RAC",
+      "description": "Catalog-only; vacancy-specific criteria not supported",
+      "active": false,
+      "source_ids": []
+    }
+  ],
+  "cycles": [
+    {
+      "cycle_id": "jee-main:2027:s1",
+      "exam_id": "jee-main",
+      "year": 2027,
+      "phase": "Session 1",
+      "display_name": "JEE Main 2027 — Session 1",
+      "is_active": true
+    },
+    {
+      "cycle_id": "jee-main:2027:s2",
+      "exam_id": "jee-main",
+      "year": 2027,
+      "phase": "Session 2",
+      "display_name": "JEE Main 2027 — Session 2",
+      "is_active": true
+    },
+    {
+      "cycle_id": "neet-ug:2027",
+      "exam_id": "neet-ug",
+      "year": 2027,
+      "phase": null,
+      "display_name": "NEET UG 2027",
+      "is_active": true
+    },
+    {
+      "cycle_id": "nda-na:2027:i",
+      "exam_id": "nda-na",
+      "year": 2027,
+      "phase": "I",
+      "display_name": "NDA / NA I 2027",
+      "is_active": true
+    },
+    {
+      "cycle_id": "nda-na:2027:ii",
+      "exam_id": "nda-na",
+      "year": 2027,
+      "phase": "II",
+      "display_name": "NDA / NA II 2027",
+      "is_active": true
+    },
+    {
+      "cycle_id": "gate:2027",
+      "exam_id": "gate",
+      "year": 2027,
+      "phase": null,
+      "display_name": "GATE 2027",
+      "is_active": true
+    },
+    {
+      "cycle_id": "upsc-ese:2027",
+      "exam_id": "upsc-ese",
+      "year": 2027,
+      "phase": null,
+      "display_name": "UPSC ESE 2027",
+      "is_active": true
+    },
+    {
+      "cycle_id": "ssc-je:2026",
+      "exam_id": "ssc-je",
+      "year": 2026,
+      "phase": null,
+      "display_name": "SSC JE 2026",
+      "is_active": true
+    },
+    {
+      "cycle_id": "ssc-cgl:2026",
+      "exam_id": "ssc-cgl",
+      "year": 2026,
+      "phase": null,
+      "display_name": "SSC CGL 2026",
+      "is_active": true
+    },
+    {
+      "cycle_id": "ssc-chsl:2026",
+      "exam_id": "ssc-chsl",
+      "year": 2026,
+      "phase": null,
+      "display_name": "SSC CHSL 2026",
+      "is_active": true
+    }
+  ]
+}

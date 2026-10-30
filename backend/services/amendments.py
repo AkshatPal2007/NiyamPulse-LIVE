@@ -7,7 +7,7 @@ Callers cannot turn a plan into evidence that any of those steps happened.
 from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 
-from backend.schemas import AmendmentChange, ChangeOperation, RuleDefinition
+from backend.legacy_schemas_v1 import AmendmentChange, ChangeOperation, RuleDefinition
 from backend.services.rule_engine import (
     EngineError, content_fingerprint, rule_fingerprint, validated_rules,
 )

@@ -1,240 +1,207 @@
-# PROGRESS.md — NiyamPulse LIVE
+# PROGRESS — NiyamPulse v2 migration
 
-**Last updated:** 30 October 2026  
-**Primary track:** Culture Coded (Sarvam AI)  
-**Development target:** Windows 10/11, native Python 3.12, PowerShell  
-**Current milestone:** M2 — Local PDF backend verified; M3 frontend next
+**Updated: 31 October 2026 (IST). Native Windows / Python 3.12.10.**
 
-**Overall status:** 🟡 **PHASES 1–2 BACKEND IMPLEMENTED AND TESTED; FRONTEND AND SARVAM NOT IMPLEMENTED**
+The current product is a multi-exam subscription and notification platform, not
+an upload-first scholarship dashboard. The first v2 informational vertical slice
+is implemented. V1 code, schema 1.1.0, APIs, tests, fixtures and documentation are
+preserved; earlier progress is archived in `docs/legacy-v1/PROGRESS.md`.
 
-> This ledger prevents agents from mistaking a product plan for shipped software. Update it after each meaningful code change, with the exact tests and environment used. Demo numbers are synthetic fixtures until an actual evaluation script produces them.
+## M0 — Audit and safe contract merge: DONE
 
-## 1. Scope locked for v1
+- Clean starting checkout: `70ada56`; backend only, no existing frontend.
+- Audited reusable evaluator, amendment planner, PDF/evidence handling, SQLite
+  transactions and FastAPI routes. See `docs/MIGRATION_AUDIT.md`.
+- Preserved this repository's newer schema 1.1.0 byte-for-byte as
+  `backend/legacy_schemas_v1.py`; did not replace it with the kit's older copy.
+- V1 modules import their explicit legacy DTOs. Remaining old symbol imports
+  forward to legacy without payload conversion. `/api/v1` stays operational.
+- Integrated v2 contracts, catalog, disabled source registry and supplied tests.
+- Verified native baseline: **61 existing tests passed**, then **8 supplied v2
+  contract tests passed**. `python -m backend.schemas`: v2 imports/schemas passed.
 
-**Product:** NiyamPulse LIVE. A watched source brings a scholarship corrigendum; a source gate checks lineage; a human reviews; deterministic rules are revised; applicant statuses recalculate; an impact wave appears; each explanation links to literal evidence; optional Hindi speech makes the result accessible.
+## M1 — Catalog, owned subscriptions and inbox: DONE for local demo
 
-**Closed rules:** minimum marks, maximum annual household income (INR), application deadline, inclusive age bounds as of a specified date, required documents.
+- Additive v2 SQLite tables; no v1 records or working modules deleted.
+- Public searchable audience catalog; server-owned cycle/topic subscriptions,
+  update/pause/unsubscribe, self-reported application status.
+- Expiring opaque local demo sessions. `/me` derives ownership from the session;
+  `/admin` checks operator role. Three seeded pseudonymous identities are marked
+  SYNTHETIC DEMO. This is not production authentication.
+- Optional profile fields require explicit personalization opt-in; removal and
+  account deletion revoke sessions and delete owned subscriptions/inbox records.
+- Private signed-cursor inbox, newest-first pagination, idempotent marking read.
+- Responsive React/TypeScript/Vite/Tailwind UI with distinct learner/operator
+  experiences; types generated from actual FastAPI OpenAPI.
+- Browser walkthrough: school learner followed JEE, engineering learner followed
+  GATE; a reviewed synthetic JEE update reached only the school learner. Opening
+  it persisted READ. The engineering inbox stayed empty.
 
-**Statuses:** `PASS`, `FAIL`, `UNKNOWN`, `CONFLICT` (no automatic official eligibility approval).
+## M2 — Two real source adapters: DONE within declared scope
 
-**Demo:** Synthetic original + corrigendum, controlled cohort, legitimate and unverified amendment, reproducible measured evaluation; 90-second no-slides flow with an offline replay fallback.
+- Real direct HTTP checks performed on **NTA JEE Main** and **UPSC active exams**,
+  different publishers. Both listings returned HTTP 200. Actual downloads were
+  extracted and one mapped notice per source persisted locally.
+- Native command `python -m backend.monitor --check nta-jee-main --discover --enable`:
+  1 recognized link, 1 created notice, no errors. JEE Main 2027 Session 1.
+- Native command `python -m backend.monitor --check upsc-active --discover --enable`:
+  5 recognized links, 1 created notice, 4 explicitly unmapped older cycle items,
+  no errors. UPSC ESE 2027. No routing of 2026 NDA/ESE items to 2027 subscribers.
+- Both source adapters enabled in the **local runtime database** only after those
+  successful checks. Checked-in registry defaults remain disabled for new setups.
+- Exact HTTPS hosts, public DNS/address checks, bounded downloads, validated
+  redirects, robots checks, hourly scheduling, error reporting and cooldowns.
+- NTA's robots file allows the public listing. UPSC's robots URL redirects to
+  its homepage with no directives; the exact nonstandard result is recorded.
+  This is not proof of permission, authenticity or complete site coverage.
+- Source worker is independent of the frontend and can run as its own Windows
+  process. Runtime health/heartbeat is observed, not fabricated.
+- Actual HTML/robots captures and hashes are in `tests/fixtures/official/`.
+- Regression reproduced then fixed: footer visitor-counter changes must not create
+  another notice. Meaningful extracted-content hashes drive dedup; immutable raw
+  captures retain actual byte hashes.
+- Scope: NTA listing/PDF notices and UPSC active-exam detail pages. Deep attachment
+  crawling, pagination across archive years and the other publisher adapters remain
+  future increments. No nationwide/all-exam coverage claim.
 
-**Recommended app stack:** React/TypeScript/Vite/Tailwind frontend; Python 3.12 FastAPI/Pydantic 2/PyMuPDF/SQLite/Watchdog backend; Sarvam APIs for OCR/structured extraction/STT/TTS. Avoid extra orchestration infrastructure until needed.
+## M3 — Review, informational matching and delivery: DONE; rule bridge PARTIAL
 
-## 2. What actually exists
+- Immutable raw source captures and extraction snapshots; evidence binds source
+  byte hash, extraction version/ID, page and exact offsets.
+- Live publication rechecks listing lineage, exact cycle mapping, stored hashes
+  and frozen quotes. Rule-like notices requiring validation cannot bypass the
+  deterministic bridge through informational approval.
+- Operator identity checked against the authenticated session; expected notice
+  revision and deterministic request hash provide stale-write/idempotency checks.
+- Review, immutable update, deterministic cycle/topic matches and in-app delivery
+  persist in one transaction. Unique `(update_id,user_id)` prevents duplicate alerts.
+- Generic updates use GENERAL_UPDATE with no before/after decision pair. There is
+  no per-subscriber LLM call and no invented PASS/FAIL or application confirmation.
+- Forced delivery-write failure was tested: review/update/matches/alerts rolled
+  back together. Altered immutable-text binding was reproduced failing, then fixed.
+- V1's five-rule evaluator remains authoritative and fully tested. Publishing v2
+  personalized rule changes is intentionally held until its evidence/review bridge
+  and opted-in profile mapping are completed.
+- Admin counters and per-cycle charts derive from persisted database records.
 
-| Artifact | State | Verification |
-|---|---|---|
-| `AGENTS.md` | ✅ Created | Instructions and repository conventions written |
-| `SHARED_CONTRACTS.md` | ✅ Created | Endpoints, versioned payloads and trust/decision contract written |
-| `backend/schemas.py` | ✅ Created | Pydantic v2 models, validators, discriminated rule union; JSON Schema generation smoke-checked |
-| `PROGRESS.md` | ✅ Created | This coordination ledger |
-| Native Windows / Python 3.12 run | ✅ Verified | Python 3.12.10 / Pydantic 2.14.2; 61 tests, schema smoke and pip check passed |
-| FastAPI server and HTTP endpoints | ✅ M2 implemented | Real Uvicorn HTTP smoke and API tests; public schema 1.1.0 |
-| React frontend and UI animations | ⬜ Not started | Wireframes/spec only |
-| Document ingestion / local folder watcher | ✅ M2 implemented | Actual PyMuPDF extraction; Watchdog detects stable new local corrigenda, suppresses duplicates, reports observed health; no automatic apply |
-| Sarvam API integration | ⬜ Not started | Sponsor endpoints not tested with actual credentials |
-| SourceGate + provenance controls | ✅ M2 implemented for declared template | Literal/value/date/scope checks, configured acquisition, authority/scheme/reference/chronology checks, quarantine/manual-review holds; no authenticity certification |
-| Amendment resolver / rule evaluator | ✅ M1 implemented | Five rule types, aggregation, effective windows, scoped conflicts, uncommitted ADD/REPLACE/REVOKE planning and PREVIEW impact |
-| Source-highlighting inspector | 🟡 Evidence API ready | Stored PDF + exact page text/quote endpoints tested; frontend and exact boxes remain unimplemented |
-| Hindi speech + numeric/date guard | ⬜ Not started | No live/cached audio created |
-| Synthetic dataset / benchmark | 🟡 Initial fixtures only | Three English/Hindi text pairs, 13 synthetic profiles and independent gold outcomes; benchmark/scorecard not implemented |
-| Demo run and offline replay | 🟡 Backend walkthrough ready | Synthetic PDF → extraction → gate → reviewed baseline/apply → persisted event tested; no frontend or full product replay yet |
+## M4 — Sarvam and accessibility: PARTIAL; text/OCR integration implemented
 
-### M1 artifacts added
+**DONE / VERIFIED:**
 
-- `backend/services/rule_engine.py`: deterministic rule checks, reason codes, aggregation, canonical content hashes and fail-closed verification inputs.
-- `backend/services/amendments.py`: pure, uncommitted plans preserving unrelated rule history and rejecting ambiguous/incompatible/overlapping changes.
-- `backend/services/impact.py`: backend-owned PREVIEW transitions/counts; never claims a committed apply.
-- `backend/services/README.md`: trust boundary, function usage, verified behavior and assumed demo conventions.
-- `backend/synthetic_demo.py` and `datasets/synthetic/phase1/`: strict fixture-only English/Hindi clause parser, measured text hashes/anchors, three pairs and 13 synthetic applicants.
-- `backend/tests/`: 37 tests using standard-library unittest; no extra test dependency.
-- `requirements.txt` and `.gitignore`: Pydantic v2 dependency range and exclusions for environments, credentials and generated caches. Previously tracked bytecode removed from version control.
+- User configured the key locally and explicitly authorized a **₹50 total test
+  budget**. No key was printed, copied to frontend, or committed. `.env` is ignored.
+- Additive migration 003: immutable model cache, request/reservation ledger, saved
+  OCR jobs and notice-analysis projection. Existing v1/v2 data remains preserved.
+- Real `sarvam-105b` requests authenticated successfully. Fixed bounded output,
+  non-thinking mode, strict JSON schema, source/prompt/version keyed cache,
+  timeouts, server-side role/revision checks and persistent integer-paise cap.
+- Literal/date/topic/cycle guards reject invented or unsupported candidates.
+  Whitespace-only folded quotes resolve only to one exact immutable source span.
+  Rejected candidates cannot publish, including through direct API calls.
+- Actual **UPSC ESE 2027 captured detail page** produced a VALIDATED candidate.
+  English summaries are extractive. Controlled Hindi labels copy verified source
+  values and retain original passages, without guessing numeric date conventions.
+- Actual **NTA three-page PDF** had badly garbled embedded text. The first AI
+  proposals failed the quote guard. Sarvam Vision/Document AI completed **3/3 pages**.
+  Its observed `digitise`/page-block response differs from SDK 0.1.41's union; a
+  regression-tested REST result reader handles it. The existing job was resumed,
+  never resubmitted just to fix client parsing.
+- Immutable raw PDF, prior embedded extraction, raw OCR cache and a versioned
+  HTML-table-to-text extraction are retained. No page boxes are claimed verified.
+- NTA fact proposals **still fail exact evidence checks** after OCR and remain
+  GUARD_REJECTED/held. This is not reported as extraction success or publication.
+- Blank/scanned PDFs are now retained as NEEDS_EXTRACTION instead of being lost;
+  they cannot publish or enable an adapter until usable text exists.
+- Local budget ledger: **7 admitted operations (6 chat requests + 1 OCR job),
+  ₹35 reserved of ₹50**, 11,605 provider-reported prompt tokens and 3,647 completion
+  tokens. GET status/result reads and cache replay create no additional reservation.
+  Reservations are conservative local allowances, **not measured provider bills**.
+- Admin UI shows cache/provenance/coverage, guarded Hindi overview, budget state,
+  OCR recovery and publication hold. Language preference selects frozen reviewed
+  summaries; no per-subscriber model calls.
+- Local synthetic tests verify Hindi fan-out, tampered-summary rejection, incomplete
+  outputs, identity/role/stale writes, quota/budget failures, OCR page coverage,
+  empty-text retention and source-byte preservation.
 
-### Local tooling check performed on this starter
+**PARTIAL / manual gate:** the genuine UPSC candidate is ready for human source
+review, not auto-approved. Genuine NTA stays held. Existing synthetic publications
+and user-created subscriptions were preserved; no genuine notice was published.
 
-- `python -m backend.schemas`: **passed** in the artifact-building environment.
-- Pydantic JSON Schema generation for the main models: **passed** in the artifact-building environment.
-- Environment used for the above: **Python 3.13.5**, **Pydantic 2.13.5**, **not Windows**.
-- Do **not** treat these as a native Windows Python 3.12 compatibility certification.
+**NOT STARTED:** free-form Hindi generation/translation evaluation, voice input,
+TTS, production login and the v2 personalized-rule publication bridge. The old
+Python evaluator remains authoritative; informational alerts invent no decisions.
 
-### M1 native Windows verification — 30 October 2026
+## M5 — Verification and demo: DONE for the first informational slice
 
-**VERIFIED:** native Windows, Python **3.12.10** (MSC AMD64), Pydantic **2.14.2**, using `.venv\Scripts\python.exe`.
+**VERIFIED** in this checkout:
+
+- Initial migration suite: **82 passed**. Latest Sarvam/OCR combined native suite:
+  **101 passed**, **38 unittest subtests passed**, one non-failing dependency
+  deprecation warning; 32.21 seconds. Production UI build, schema smoke and
+  `pip check` passed after the integration.
+- Reproduced and fixed test-package collection collision with importlib mode.
+- Reproduced and fixed a source-enable dry-run bypass: enabling now requires
+  real mapped document discovery/extraction; CLI rejects incomplete arguments.
+- Production UI build passed: TypeScript and Vite, with generated API types.
+- Schema smoke and `pip check` passed. The preserved v1 schema matches commit
+  `70ada56` byte-for-byte. `git diff --check` passed.
+- Production FastAPI `/`, `/api/v1/health`, `/api/v2/status`, `/api/v2/catalog`
+  returned HTTP 200. Browser loaded built UI without console errors.
+- Genuine student/admin screenshots saved under `output/screenshots/`.
+- Browser flow verified subscriptions, review, correct recipient exclusion,
+  delivered alert, literal evidence and read state.
+- Responsive DOM bounds checked at desktop width (1425 CSS pixels): no horizontal
+  overflow, three-column grid. Mobile visual checks performed in the in-app browser.
+- Existing non-failing Starlette httpx TestClient deprecation remains visible.
+- No accuracy scorecard, benchmark baseline or full Sarvam/voice/rule pipeline exists.
+
+Exact commands:
 
 ```powershell
-py -3.12 --version
+.\.venv\Scripts\python.exe -m pytest -q
 .\.venv\Scripts\python.exe -m backend.schemas
-.\.venv\Scripts\python.exe -m unittest discover -s backend/tests -v
-.\.venv\Scripts\python.exe -m backend.synthetic_demo
+.\.venv\Scripts\python.exe -m scripts.export_openapi
+npm --prefix frontend run types
+npm --prefix frontend run build
+.\.venv\Scripts\python.exe -m backend.monitor --check nta-jee-main --discover --enable
+.\.venv\Scripts\python.exe -m backend.monitor --check upsc-active --discover --enable
 ```
 
-- Schema smoke check: **passed**. JSON schemas generated successfully for all **34** Pydantic contract models.
-- Test discovery: **37 passed**. Tests first failed on absent implementations; a maximum-date overlap regression was separately reproduced as a failing assertion and passed after the fix.
-- Fixture replay: **passed** for all three pairs, matching independently authored gold outcomes across **13** synthetic profiles. Gold labels do not drive predictions.
-- Marks relaxation: 5 evaluated, 2 changed (1 improved, 1 review-required), 3 unchanged.
-- Hindi income tightening: 4 evaluated, 1 changed (1 worsened), 3 unchanged.
-- Document expansion: 4 evaluated, 2 changed (1 worsened, 1 review-required), 2 unchanged.
-- These are actual test-fixture results, **not** benchmark accuracy scores, official scholarship approvals or live-source processing.
+## Remaining / next smallest increments
 
-**ASSUMED:** fixture target maps/effective dates and trust are curated test inputs. The engine accepts content-bound upstream attestations, not an evidence-presence shortcut. February 29 age handling and conservative scope-overlap policy are documented in `backend/services/README.md`.
+1. Human source review of the genuine UPSC informational notice; NTA remains held
+   until its candidate evidence passes. Then verify a real-source alert with a
+   synthetic subscribed learner.
+2. V2 validated personal-rule amendment bridge into the preserved evaluator.
+3. More source adapters, attachment-level monitoring and exact cycle fixtures.
+4. Real account authentication and public-deployment privacy/consent controls.
+5. Multilingual evaluation corpus, measured metrics and replay from recorded inputs.
 
-**UNTESTED:** PDF parsing/OCR, production evidence and lineage gate, publication chronology, human review workflow, atomic persistence, watcher, API, frontend, Sarvam and full offline product replay. Text-file source hashes must not be described as PDF hashes. No HTTP field, enum, default or schema version changed.
+## Design assumptions and practical limits
 
-### M2 implementation and verification — 30 October 2026
+**ASSUMED:** this is a loopback-only prototype with synthetic local identities.
+In-app DELIVERED means a persisted private inbox row. One source worker is run
+at a time; coverage is bounded to the implemented listing/detail adapters.
 
-**VERIFIED:** native Windows Python **3.12.10**, Pydantic **2.14.2**, FastAPI **0.162.0**, Uvicorn **0.54.0**, PyMuPDF **1.28.2**, Watchdog **6.0.0**, python-multipart **0.0.32**, httpx **0.28.1**.
+**UNTESTED / not implemented:** free-form Hindi generation/audio, production
+authentication, all-exam coverage, v2 personalized rule-change publication and
+benchmark accuracy. No success or scorecard is claimed for these.
 
-- `backend/main.py`: working health/workspace/import/original-review/preview/apply/PDF/extraction/timeline/events API, explicit localhost CORS and typed errors. HTTP 202 queues extraction; it never means approval.
-- `backend/storage.py` and `backend/migrations/001_initial.sql`: SQLite bootstrap migration, immutable source/extraction/acquisition/snapshot/event records, content integrity checks, signed workspace-bound cursors and consistent read snapshots.
-- `backend/services/pdf_intake.py`, `clauses.py`, `provenance.py`: real PDF extraction, strict notice grammar, literal page offsets, evidence for condition **and effective date**, exact candidate comparison, source lineage/authority/scheme/date gates. No OCR or inferred unsupported conditions.
-- `backend/services/workspace.py`: source checks repeated within revision-checked `BEGIN IMMEDIATE` review/apply transactions. Review, rule history, decisions, snapshot and amendment event commit together or roll back together. Intake and previews never mutate active decisions.
-- `backend/services/watcher.py`: actual stable-file Watchdog intake for local **corrigenda**; no auto-apply, content hash deduplication, read retries and observed runtime health. Original notices require explicit upload/review.
-- `backend/demo_setup.py`, `backend/demo_fixtures.py`, `output/pdf/`: reproducible synthetic workspace/profiles and three actual PDFs (original, corrigendum, authority mismatch). Setup is idempotent and never imports/reviews/applies. The local `var/` data directory is ignored by Git.
-- `README.md`: manual walkthrough and run commands. `MODEL_HANDOFF.md`: copyable model context. Shared API version bumped to **1.1.0** in both schemas and contract documentation for new routes/diagnostic fields.
+All migration changes remain local for review; no Git push or public deployment
+was performed. Only agent-owned verification servers are stopped after QA. A pre-existing user
+server on port 8000 was left untouched. Restart it with `--env-file .env` to load
+the new integration. The temporary verification server uses port 8001 without a
+second source worker.
 
-Commands/results:
 
-```powershell
-.\.venv\Scripts\python.exe -m unittest discover -s backend/tests -v
-.\.venv\Scripts\python.exe -m backend.schemas
-.\.venv\Scripts\python.exe -m pip check
-.\.venv\Scripts\python.exe -m backend.demo_setup
-```
+## Current human handoff gate
 
-- **61 tests passed**, including all Phase 1 tests. Negative cases cover unknown sources, supplied-URL trust spoofing, authority/scheme/reference/date mismatches, missing review, unsupported partial documents, scans, malformed PDF bytes, altered evidence/values/scope/dates, bad targets/overlaps, immutable records and stale revisions.
-- A forced event insert failure rolled back review, rules, decisions, revision and snapshot. Concurrent applies produced one winner and one 409, with one event. Restart resumed pending extraction. Cache reuse preserved document identity.
-- New regressions were written/reproduced failing for missing effective-date evidence and inconsistent multi-query reads, then passed after fixes. Initial tests failed before the Phase 2 modules existed.
-- Actual watcher test copied a new PDF, observed the measured SHA-256 and READY_TO_APPLY state, preserved FAIL until explicit apply, deduplicated a renamed copy, and verified shutdown health.
-- Full synthetic PDF/API pair reproduced the Phase 1 gold result: **5 evaluated, 2 changed (1 improved, 1 review-required), 3 unchanged**. The mismatch PDF was quarantined. These are fixture outcomes, not benchmark accuracy scores.
-- Schema import and all **39** contract-model JSON schemas passed. OpenAPI exposes actual v1.1.0 routes/models. `pip check`: no broken requirements.
-- Real Uvicorn process on loopback: health, initial revision-0 workspace, actually running local watcher, Swagger and OpenAPI passed. The smoke server was stopped; start the server manually for further interaction.
-- Three source PDFs rendered through bundled Poppler and all page PNGs visually inspected: legible, no clipped clauses. Poppler emitted missing display-font mapping warnings; rendered Helvetica text was intact. Runtime API boxes remain empty, so no exact highlighting claim is made.
-- Non-blocking dependency note: Starlette 1.10.0 warns that its httpx TestClient adapter is deprecated. The adapter works and all tests passed; no warning was hidden.
-
-**ASSUMED / scope:** only the declared notice-template grammar is parsed. Demo configuration trusts known generated PDF hashes and the operator-configured local folder; matching either is not cryptographic authenticity. Review names are local operator assertions, not authenticated identities. The demo evaluates the date 2026-10-30 in the Indian calendar; publication/acquisition chronology uses India's +05:30 date. Historical profiles are not editable through HTTP.
-
-**UNTESTED / future:** arbitrary free-form notices, Hindi PDF rendering/OCR, Sarvam, authentication/remote deployment, frontend animations/review UI, exact coordinate highlights, a 20+ pair benchmark/baseline and full product offline replay. English PDFs and Hindi Phase 1 text fixtures are tested. No scorecard or live sponsor success is claimed.
-
-## 3. Immediate first run — native Windows PowerShell
-
-In the unpacked project root:
-
-```powershell
-py -3.12 --version
-py -3.12 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install --upgrade pip
-.\.venv\Scripts\python.exe -m pip install "pydantic>=2.9,<3"
-.\.venv\Scripts\python.exe -m backend.schemas
-```
-
-**Expected:** prints `NiyamPulse schemas v1.1.0: import OK` and the beginning of a JSON Schema. It does **not** start a server. The Phase 2 server now exists; use `README.md` for dependency installation, synthetic setup and launch.
-
-If PowerShell cannot find `py -3.12`, install/register Python 3.12 and rerun the version check. Do not switch to a different Python version silently.
-
-## 4. Milestone plan (ordered by integration risk)
-
-### M0 — Contract bootstrap (this delivery)
-
-- [x] Document single coherent product story, trust boundaries and v1 scope.
-- [x] Define typed rule, evidence, amendment, gate, profile, event, explanation and evaluation DTOs.
-- [x] Freeze a planned `/api/v1` handshake and DTO naming.
-- [x] Confirm on native Windows Python 3.12 and add an automated unit test command.
-
-**Exit criterion:** clean import + schema build on Windows Python 3.12; team agrees that fields/endpoint names are stable.
-
-### M1 — Pure decision engine and synthetic fixtures
-
-- [x] Implement deterministic evaluators for five closed rule types.
-- [x] Implement aggregate precedence and four statuses with explainable reason codes.
-- [x] Implement effective intervals, targeted `ADD/REPLACE/REVOKE`, scope matching and conflict detection.
-- [x] Build initial synthetic personas and at least three original/corrigendum fixtures (English and Hindi; UTF-8 text, not PDFs).
-- [x] Unit-test FAIL→PASS, PASS→FAIL, UNKNOWN, CONFLICT, and unrelated amendment preservation.
-
-**Exit criterion:** Python-only tests reproduce golden profile outcomes with no LLM or network dependency.
-
-### M2 — Intake, immutable provenance, and SourceGate
-
-- [x] Add SQLite schema, migration/bootstrap, document hash storage, extraction snapshots.
-- [x] Add PDF intake API and local `watchdog` folder watcher with duplicate hash suppression.
-- [x] Add quote/evidence verification and source-reference/authority/effective-date checks.
-- [x] Require explicit reviewed approval; quarantine mismatches; commit atomically on revision match.
-- [x] Implement preview/apply/events/timeline HTTP endpoints with OpenAPI response models.
-
-**Exit criterion:** new controlled synthetic notice triggers a real preview; only reviewed supported amendments may change committed applicant results.
-
-### M3 — High-impact frontend
-
-- [ ] Build command center, version timeline, applicant grid, and status legend.
-- [ ] Connect to real API state and event feed; poll and deduplicate event IDs.
-- [ ] Animate only backend-derived `DecisionTransition` states.
-- [ ] Build evidence inspector with PDF pages and graceful text-only fallback.
-- [ ] Add source quarantine screen and visible disclaimer.
-
-**Exit criterion:** an operator can see and explain a genuine deterministic decision shockwave without slides.
-
-### M4 — Sarvam integration
-
-- [ ] Verify API key and each actual endpoint with tiny test inputs; record versions/limits and cost.
-- [ ] Add document OCR fallback for short scanned Hindi/Devanagari pages.
-- [ ] Add `sarvam-105b` structured candidate extraction with explicit schema validation.
-- [ ] Add a short Saaras Hindi/Hinglish question and Bulbul response.
-- [ ] Validate Hindi facts and number/date preservation before audio; refuse unverifiable speech.
-- [ ] Cache extraction/output by document hash and model version; label cache/replay accurately.
-
-**Exit criterion:** real sponsor API calls are load-bearing on at least one end-to-end tested path.
-
-### M5 — Evaluation, reliability and showcase
-
-- [ ] Generate **20+** labeled synthetic document pairs, both English and Hindi/Devanagari.
-- [ ] Save gold rule, supersession, date, source-gate, and applicant decision labels.
-- [ ] Run end-to-end evaluation and preserve raw failures, numerator and denominator.
-- [ ] Run honest single-LLM baseline on the same test set; if unavailable, hide baseline rather than fake it.
-- [ ] Add offline replay and API/network-error indicators.
-- [ ] Rehearse an uninterrupted 90-second product demo with one timed backup path.
-
-**Exit criterion:** measured synthetic scorecard, reproducible run metadata, no invented metrics, documented failure cases.
-
-## 5. Priority-ordered cuts (if schedule becomes constrained)
-
-Protect the primary visual loop: **apply reviewed amendment → deterministic cohort impact → source proof**.
-
-1. Cut nationwide/remote crawlers; keep genuine local-folder monitoring.
-2. Cut arbitrary language choices; support Hindi text and a single tested Hindi voice route.
-3. Cut full two-clock historical exploration; retain a simple effective-date timeline.
-4. Cut exact text-box highlighting on unreliable OCR pages; retain page + literal quote proof.
-5. Cut live baseline comparison UI; retain documented offline evaluation scores if actually measured.
-6. Cut advanced visual effects; keep clear animated status transitions.
-7. Cut extra sponsor integrations and multi-agent orchestration.
-
-Do **not** cut the actual rule evaluator, provenance gate, review approval, real impact computation, or source evidence. If these cannot work, do not label a scripted animation as a functional product.
-
-## 6. Open questions and fastest tests
-
-| Question | Current answer | Fastest resolution |
-|---|---|---|
-| Does hackathon permit writing/submitting product code before event? | **User-supplied brief says yes; public rules not independently confirmed.** | Ask organizer for written clarification and preserve timestamped repo history. |
-| Do credited Sarvam endpoints work in this account? | **Untested** | Make one tiny structured generation call, one 1-page Vision request, one <30s Saaras request, one short Bulbul output. |
-| Can OCR yield exact quote positions for a Hindi PDF? | **Untested** | Use a 1-page Devanagari sample; compare OCR text and bounding boxes against original page rendering. |
-| Do Pydantic models work on native Windows Python 3.12? | **Verified:** Python 3.12.10 / Pydantic 2.14.2 | Current v1.1.0 schema import, all 39 model JSON schemas and 61 tests passed. |
-| How to prove local watcher truly detects new notices? | **Verified in native test and real-server health** | Stable copied PDF was detected with matching SHA-256 and no automatic apply; UI demonstration remains Phase 3. |
-| Does the baseline do worse than the structured engine? | **Unknown until evaluated** | Run both on the same labeled synthetic cases; never predict a score. |
-
-## 7. Risks / limitations to keep visible
-
-- The system supports **five narrow rule types** only. It cannot interpret arbitrary legal/administrative exceptions safely.
-- A matching authority name, reference, or configured URL is not definitive proof a document is authentic.
-- The application is **decision support**, not official eligibility approval or legal advice.
-- LLM/OCR extraction can be wrong. Exact source quoting, typed validation, review gates, and abstentions reduce risk but do not eliminate it.
-- Synthetic benchmark scores are evidence for the **synthetic distribution tested**, not real-world accuracy.
-- Applicant information must be minimized and handled with appropriate consent and controls in any non-demo deployment.
-
-## 8. Work log
-
-| Date | Work | Tests / evidence | Next step |
-|---|---|---|---|
-| 2026-10-30 | Initial four-file contract scaffold | Pydantic import and JSON Schema generation in Python 3.13.5/Linux; Windows 3.12 pending | M0 Windows run, then M1 pure rules + gold fixtures |
-| 2026-10-30 | Verified M0; implemented M1 evaluator, uncommitted amendment planner, PREVIEW impact, strict synthetic text parser, 3 pairs/13 profiles, tests and local tooling | Native Windows Python 3.12.10 / Pydantic 2.14.2; `python -m backend.schemas`; `python -m unittest discover -s backend/tests -v`: 37 passed; `python -m backend.synthetic_demo`: 3 pairs matched gold; maximum-date regression reproduced then fixed | M2 PDF intake, immutable extraction/source gate, review and transactional API |
-| 2026-10-30 | Implemented M2 PDF/SQLite/source-gate/review/apply API, actual local watcher, v1.1.0 contracts, synthetic PDFs, walkthrough and model handoff | Native Windows Python 3.12.10: 61 tests passed; 39 JSON schemas; pip check; real Uvicorn HTTP smoke; Poppler visual inspection; rollback/concurrency/read-snapshot regressions verified | M3 real API-driven frontend |
-
-**Next owner task:** M3 frontend — generate TypeScript from actual OpenAPI 1.1.0, connect review/source inspection and four-status profiles to real API data, poll/deduplicate events and animate actual transitions. No Sarvam credentials are needed yet. Manual backend review steps are in `README.md`.
+Stop/restart your existing local API with `--env-file .env`. The synthetic
+Engineering learner is already subscribed to UPSC ESE 2027 with Hindi preference,
+prepared through the actual UI. No real applicant data was added. Switch to
+Platform operator, open the genuine Engineering Services (Preliminary) Examination,
+2027 notice, open its original source, compare exact dates/cycle, enter a review
+reason and approve only if satisfied. Return to that learner's inbox and open the
+new alert. NTA must stay held/quarantined; no bypass of its rejected evidence.
+Human review is required by AGENTS.md invariant 3. This is the next manual action;
+no real applicant personal data or official application submission is needed.

@@ -14,7 +14,7 @@ from fastapi.responses import JSONResponse, Response
 from pydantic import HttpUrl
 from starlette.exceptions import HTTPException
 
-from backend.schemas import (
+from backend.legacy_schemas_v1 import (
     ApiError, ApplyAmendmentRequest, ApplyAmendmentResponse, DocumentExtraction,
     DocumentKind, EventFeedResponse, HealthResponse, ImportDocumentResponse,
     PreviewAmendmentResponse, ReviewOriginalRequest, TimelineSnapshot, WorkspaceState,
@@ -26,12 +26,26 @@ from backend.services.workspace import WorkspaceService
 from backend.storage import ServiceError, Store, WorkspaceConfig
 
 
-def create_app(store=None, *, clock=None, enable_watchers=True):
+def create_app(store=None, *, clock=None, enable_watchers=True, v2_demo=None, enable_web_monitor=None):
     @asynccontextmanager
     async def lifespan(app):
         app.state.store = store or Store(Path(os.environ.get("NIYAMPULSE_DATA_DIR", "var")) / "niyampulse.sqlite3")
         app.state.service = WorkspaceService(app.state.store, clock)
         app.state.watchers = {}
+        from backend.exam_store import ExamStore
+        from backend.services.exams import ExamService
+        from backend.services.source_monitor import SourceMonitor, SourceScheduler
+        from backend.services.sarvam import SarvamService
+        from backend.services.vision import VisionService
+        app.state.exam_store = store if isinstance(store, ExamStore) else ExamStore(app.state.store.path)
+        app.state.exam_service = ExamService(app.state.exam_store, demo=v2_demo if v2_demo is not None else os.environ.get("NIYAMPULSE_V2_DEMO", "1") == "1", clock=clock)
+        app.state.source_monitor = SourceMonitor(app.state.exam_store, clock=clock)
+        app.state.sarvam_service = SarvamService(app.state.exam_store, clock=clock)
+        app.state.vision_service = VisionService(app.state.sarvam_service)
+        web_monitor_enabled=enable_web_monitor if enable_web_monitor is not None else os.environ.get("NIYAMPULSE_WEB_MONITOR","1")=="1"
+        app.state.web_scheduler = SourceScheduler(app.state.source_monitor) if web_monitor_enabled else None
+        if app.state.web_scheduler:
+            app.state.web_scheduler.start()
         app.state.service.resume_pending()
         if enable_watchers:
             with app.state.store.connect() as con:
@@ -44,11 +58,26 @@ def create_app(store=None, *, clock=None, enable_watchers=True):
         try:
             yield
         finally:
+            if app.state.web_scheduler:
+                app.state.web_scheduler.stop()
             for watcher in app.state.watchers.values():
                 watcher.stop()
 
-    app = FastAPI(title="NiyamPulse LIVE", version="1.1.0", lifespan=lifespan)
-    app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5173"], allow_methods=["GET", "POST"], allow_headers=["Content-Type"])
+    app = FastAPI(title="NiyamPulse v2 · Exam intelligence", version="2.0.0", lifespan=lifespan)
+    from backend.api.exams import router
+    app.include_router(router)
+    from fastapi.responses import FileResponse
+    from fastapi.staticfiles import StaticFiles
+    frontend_dist=Path(__file__).resolve().parents[1]/"frontend"/"dist"
+    if (frontend_dist/"assets").is_dir():
+        app.mount("/assets",StaticFiles(directory=frontend_dist/"assets"),name="frontend-assets")
+
+    @app.get("/",include_in_schema=False)
+    def frontend():
+        if not (frontend_dist/"index.html").is_file():
+            raise ServiceError(503,"FRONTEND_NOT_BUILT","Build the frontend with npm --prefix frontend run build, then restart the backend")
+        return FileResponse(frontend_dist/"index.html")
+    app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5173"], allow_methods=["GET", "POST", "PATCH", "DELETE"], allow_headers=["Content-Type", "Authorization"])
 
     @app.middleware("http")
     async def request_id(request, call_next):
@@ -58,7 +87,11 @@ def create_app(store=None, *, clock=None, enable_watchers=True):
         return response
 
     def failure(request, status, code, message):
-        payload = ApiError(error_code=code, message=message, request_id=getattr(request.state, "request_id", uuid.uuid4().hex))
+        if request.url.path.startswith("/api/v2"):
+            from backend.schemas import ApiError as V2ApiError
+            payload = V2ApiError(code=code,message=message,request_id=getattr(request.state,"request_id",uuid.uuid4().hex))
+        else:
+            payload = ApiError(error_code=code, message=message, request_id=getattr(request.state, "request_id", uuid.uuid4().hex))
         return JSONResponse(status_code=status, content=payload.model_dump(mode="json"), headers={"X-Request-ID":payload.request_id})
 
     @app.exception_handler(ServiceError)

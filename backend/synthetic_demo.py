@@ -15,7 +15,7 @@ from pathlib import Path
 
 from pydantic import TypeAdapter
 
-from backend.schemas import (
+from backend.legacy_schemas_v1 import (
     AmendmentChange, ApplicantProfile, ImpactEvent, RuleDefinition, SourceEvidence,
 )
 from backend.services.amendments import change_fingerprint, plan_amendment

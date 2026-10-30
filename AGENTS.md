@@ -1,143 +1,81 @@
-# AGENTS.md — NiyamPulse LIVE
+# AGENTS.md — NiyamPulse v2 (source of truth for Codex)
 
-> Operating instructions for coding agents and human contributors. Read this file, then `SHARED_CONTRACTS.md`, then `PROGRESS.md` **before changing code**.
->
-> Repository status: **Phase 1 engine and Phase 2 local backend implemented and tested**. Real PDF intake, strict template parsing, source gates, explicit review, transactional apply and local watcher exist. Frontend, general notice extraction and Sarvam remain future work. See `PROGRESS.md` for verification and limitations.
+**Updated 2026-10-30. Target: native Windows, Python 3.12.** Read this file, `SHARED_CONTRACTS.md`, `PROGRESS.md`, `docs/EXAM_SOURCES.md`, and `CODEX_MIGRATION_PROMPT.md` before editing code. This is a **migration of an existing repository**, not permission to delete existing work.
 
-## 1. Mission
+## 1. Mission / product definition
 
-Build **NiyamPulse LIVE**, a visual, multilingual amendment-monitoring and decision-impact system for Indian scholarship notices. A source-linked amendment enters a watched intake; a reviewed amendment updates a closed set of rules; a **deterministic** Python engine recalculates affected applicant profiles; the frontend shows changed decisions as an animated shockwave, with evidence and accessible Hindi explanation.
+**NiyamPulse is a subscription-based, multilingual exam-update intelligence platform for Indian school students and engineering aspirants.** A person chooses exams/cycles (e.g., JEE Main 2027, NEET UG 2027, NDA I 2027, GATE 2027, UPSC ESE 2027, SSC JE 2026, SSC CGL 2026). The system periodically checks configured official announcement pages, identifies new notices, verifies source lineage, extracts evidence-linked changes, matches subscribed users, and produces in-app notifications. The operator dashboard shows genuine source health, notice review, subscriber matching and delivery metrics. **Users should not have to upload new PDFs** to receive updates from supported live sources.
 
-The live demo must communicate in 10 seconds: **“One notice changed; here is exactly who was affected.”** No slides. A 90-second judge demonstration must work from reproducible synthetic data.
+Manual upload remains **admin-only fallback / development test facility**. This is NOT a PDF chatbot. Multi-exam catalog and subscription design are core, not SSC CGL-specific.
 
-### Core product journey
+### Non-negotiable invariants
 
-1. Watch a configured local intake directory (first MVP), not an imaginary nationwide monitor.
-2. Detect a new PDF; record its SHA-256 and acquisition metadata.
-3. Extract text using PyMuPDF; use Sarvam Vision when needed for scanned/Indic pages.
-4. Use Sarvam-105B to propose *structured candidate rules*, never decisions.
-5. Check literal evidence, source lineage, dates, and amendment relationships; quarantine ambiguity or provenance failures.
-6. Require explicit human review before applying an amendment.
-7. Use pure Python for rule evaluation and before/after impact calculations.
-8. Animate only actual changed profile states; reveal original and amended source passages.
-9. Explain results in Hindi (optional Saaras input and Bulbul output) using verified facts and a numerical/date guard.
-10. Display a measured scorecard only after real tests run on a **declared synthetic** dataset.
+1. **LLM extracts/explains; deterministic Python code decides.** AI may generate proposed structured data, never official eligibility decisions, personal targeting, trust approval, or final numbers.
+2. Official-source **hostname matching is not cryptographic authenticity verification**. Record exact source URL, observed listing link, content hash, downloaded timestamp, publisher reference and validation steps. Never label a source officially certified.
+3. **No silent update propagation**: MVP routes notices through SourceGate and human admin review. Only approved supported updates create notifications. Quarantine unknown authority/reference conflicts or unsupported/ambiguous rules; informational notices may be approved and broadcast by subscription topic without eligibility claims.
+4. **Four deterministic decision states** are `PASS`, `FAIL`, `UNKNOWN`, `CONFLICT`; only use when supported rule evaluation really ran. Exam news that does not modify an evaluable rule is **GENERAL_UPDATE**, not `PASS`.
+5. Supported personal-rule types are *only* `minimum_marks`, `maximum_income_inr`, `application_deadline`, `age_bounds`, `required_documents`. Exams have more complex real eligibility; outside this closed set must abstain / request review. Age relaxations, quotas, qualifying marks, domicile, academic branch, subject combination, physical/medical standards are NOT silently covered.
+6. **No fabricated users, affected counts, notifications, delivery rates, benchmark scores or API calls.** Seed demo data only with conspicuous `SYNTHETIC_DEMO` labels. Real dashboard counters derive from database queries.
+7. **Never claim users have applied through an official portal.** `APPLIED_SELF_REPORTED` means exactly that. We never impersonate exam boards or submit official applications.
+8. Include visible disclaimer: *"Decision support only; not official eligibility or application confirmation."* Always link to official notice.
+9. Protect minors and sensitive candidate data: profile fields optional; collect no DOB, marks or income without explicit opt-in, implement account ownership checks and deletion. Reassess applicable privacy/child-consent requirements before public deployment. Use generated pseudonymous identities in demos.
+10. Offline replay loads **cached recorded inputs**, labeled as such. It runs the actual relevance/decision/notification logic. No pretend background watcher or prerecorded fake network success.
+11. **Native Windows 3.12**: use `pathlib`, PowerShell-compatible commands, SQLite local development, `.env`, no Bash-only runtime requirement. Never require Docker, Redis, Celery, Kafka or WSL for local MVP.
+12. Do not hardcode yearly GATE organizer pages as global forever URLs: source adapters must be versioned/configurable per exam cycle.
 
-## 2. Non-negotiable invariants
+## 2. Build the correct product in this order
 
-- **LLM is not the authority.** It may extract candidates and translate/express facts; it must never assign PASS, FAIL, UNKNOWN, or CONFLICT.
-- **Exactly five rule types in v1:** `minimum_marks`, `maximum_income_inr`, `application_deadline`, `age_bounds`, `required_documents`.
-- **Exactly four rule/decision statuses:** `PASS`, `FAIL`, `UNKNOWN`, `CONFLICT`. “Eligible” and “approved” are not output statuses.
-- Every operative rule needs **literal evidence** with `document_id`, `document_sha256`, `extraction_id`, 1-based `page_number`, and `literal_quote`.
-- **Evidence presence is not verification.** The service must check the literal quote against its immutable extraction; verify numeric/date agreement; resolve clause scope and source lineage before a change can apply.
-- A `MATCHED_CONFIGURED_SOURCE` result is *not* cryptographic authenticity. Avoid claiming that suspicious documents are proven forgeries.
-- Unverified/contradictory amendments are **quarantined or held for review**. Do not silently mutate active rules, alerts, or stored decisions.
-- The system must not claim official scholarship approval. Keep `Decision support only; not official approval.` visible in applicant results and voice/transcript views.
-- **No invented metrics.** UI evaluation values must come from actual persisted evaluation runs; label synthetic datasets and baseline configurations.
-- Never fabricate a successful Sarvam API call, monitoring state, screenshot, source highlight, or TTS outcome. Offline replay must be explicitly labeled.
-- Never use production applicant PII in screenshots or benchmark fixtures. Demo applicants must be synthetic.
+**P0 migration & contracts** — Audit existing repo, retain working components, keep schema-v1 compatibility; introduce v2 exam catalog, user subscription, source watcher, notice update, recipient match and notification DTOs. Agree on `/api/v2` HTTP handshake. Do not rewrite v1's deterministic engine purely for naming reasons.
 
-## 3. Technology and environment
+**P1 real subscription slice** — Display multi-exam catalog; user can subscribe to multiple active exam cycles (no personal data required), inspect own notifications; admin sees counts from database. Use seeded synthetic notices with explicit badges until fetch works.
 
-**Development OS:** native **Windows 10/11**, PowerShell, **Python 3.12** (not WSL), Node.js LTS for the UI.
+**P2 genuine source monitoring** — Implement at least **two source adapters with different publishers**: ideally NTA JEE Main (or NEET UG) + UPSC NDA/ESE or the GATE 2027 official notifications page. The source monitor should run as a background process, configured per source, with last-success, last-error and newly discovered link counts. Test HTML changes and rate limits. Only enable a source after an adapter has proven extraction on an actual page.
 
-- Frontend: React + TypeScript + Vite + Tailwind CSS; small CSS transitions for the shockwave.
-- Backend: Python 3.12, FastAPI, Pydantic **v2**, PyMuPDF, SQLite; `watchdog` for local intake.
-- Sponsor: Sarvam Vision (OCR where needed), Sarvam-105B (structured candidate extraction), Saaras v4 (short speech input), Bulbul v4 Flash (guarded speech output).
-- Do **not** add LangGraph, FAISS, Redis, Docker, Kubernetes, or Failproof AI by default. Add an external component only when it solves a demonstrated problem in the product's critical path.
-- Monetary amounts: integer INR (not float). Marks: percentage in 0–100. Dates: ISO `YYYY-MM-DD`. API timestamps: timezone-aware ISO 8601 (use UTC `Z` when emitted). Scholarship date semantics: date-only rules in the relevant local calendar, default `Asia/Kolkata` for the demo; do not silently reinterpret deadlines in UTC.
-- Use local caches keyed by content hash and extraction/model version, *not* filenames alone.
+**P3 notice/relevance pipeline** — Immutable raw HTML/PDF capture, dedup by source/URL/content hash, source gate, review queue, classification, one update per reviewed notice, fan-out by exam-cycle + topic, in-app notification persisted to DB with dedup `(update_id, user_id)`. Generic exam notices do NOT need the eligibility rule engine. Optional personalized decision changes use existing pure Python engine when all required facts/rules are known.
 
-### Native Windows setup (PowerShell)
+**P4 Sarvam integrations** — Integrate Vision (when needed), 105B structured classification/extraction and evidence-linked Hindi explanation, optional Saaras/Bulbul. API calls only with actual key, timeouts, budget logging, response validation, and cache; no imaginary success.
+
+**P5 admin + tests + demo** — Sources health, pending reviews, recent notices, delivered/read, per-update matched subscribers and computed decision flips, source references, replay mode, real evaluation (synthetic labeled data). A 90-second operator demo showcases discovery -> review -> fanout -> per-user notification and admin counters.
+
+## 3. Architecture & ownership
+
+- `backend/schemas.py`: v2 **data transfer objects only**, strict Pydantic v2.
+- `backend/legacy_schemas_v1.py`: frozen old contracts used by earlier code, including five rule union members, decision/evidence types. Gradual imports permitted. Do not remove until references are migrated and all tests pass.
+- `backend/api/`: thin FastAPI routes (to be built), auth/ownership and typed responses.
+- `backend/services/source_monitor/`: source-specific listing adapters, scheduler, HTTP fetcher, dedup, provenance. Poll only allowlisted official endpoints; disable untested adapters.
+- `backend/services/notices/`: intake, classification, evidence validation, source gate, review + atomic publication.
+- `backend/services/rules/`: pure deterministic rule engine and version resolver; port existing logic if present.
+- `backend/services/relevance/`: match cycles/topics first; only then optional deterministic profile impact.
+- `backend/services/notifications/`: persistent in-app delivery, idempotency, mark read, audit trail.
+- `backend/services/sarvam/`: API wrapper, retries, cache, structured result validation.
+- `backend/storage/`: SQLite dev persistence, migrations, source snapshots, users, profiles, exams/cycles, subscriptions, notices, approvals, updates, matches, notification events.
+- `frontend/`: React + Vite + TypeScript and simple Tailwind; student subscriptions + notification feed and separate admin operations UI. Existing UI reuse is encouraged.
+- `config/exam_catalog.json`, `config/source_registry.json`: declarative **initial catalog**, verified link candidates, disabled crawlers by default.
+- `tests/`: Python contract, pure business logic, adapter fixtures, matching and quarantine tests. Use isolated synthetic users.
+
+## 4. Minimal persistence / security
+
+Implement DB uniqueness constraints: `(user_id, cycle_id)` subscriptions, `(source_id, canonical_url, content_hash)` observed notices, `(update_id, user_id)` in-app notifications, and stable idempotency keys for review/dispatch. Make dispatch transactional using an outbox or equivalent DB transaction. Compute dashboard counts from persisted records, not UI state. No API key in git. Admin operations require admin authorization and optimistic revision checks; users can access ONLY their own profiles and notifications. Sanitize HTML, validate download content type/size, reject redirects to non-allowlisted hosts, block local/private network destinations (SSRF).
+
+## 5. Local Windows commands
 
 ```powershell
 py -3.12 --version
 py -3.12 -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-python -m pip install "pydantic>=2.9,<3"
-python -m backend.schemas
+.\.venv\Scripts\python.exe -m pip install -r requirements-contracts.txt
+.\.venv\Scripts\python.exe -m backend.schemas
+.\.venv\Scripts\python.exe -m pytest -q
 ```
 
-If activation is blocked by a PowerShell execution policy, skip activation and run commands with `.\.venv\Scripts\python.exe` directly. **Do not** change machine-wide execution policy merely for this project.
+If existing repo has its own dependency manager, adapt appropriately without destroying lockfiles. Use `node`/`npm` only if the actual frontend is React. Ask before adding cloud costs or authentication providers.
 
-**The Phase 2 backend now exists.** Install its dependencies, prepare the synthetic workspace, and launch with:
+## 6. Definition of done / Codex reporting
 
-```powershell
-python -m pip install -r requirements-dev.txt
-python -m backend.demo_setup
-python -m uvicorn backend.main:app --reload --port 8000
-```
+At each step update `PROGRESS.md` using **DONE / PARTIAL / NOT STARTED / BLOCKED** and cite executed commands and observed results. Report actual changed files, endpoint paths and smoke test output. Do not mark a remote page source "live" until an actual poll detects an official listing item. Keep this architecture and `SHARED_CONTRACTS.md` in sync with schema changes.
 
-See `README.md` for explicit original review and amendment application. Setup never reviews or applies documents automatically.
+## Existing-repository migration notes
 
-## 4. Repository conventions
-
-Planned layout (only the four contract files exist in the initial delivery):
-
-```text
-niyampulse/
-├── AGENTS.md
-├── SHARED_CONTRACTS.md
-├── PROGRESS.md
-├── backend/
-│   ├── schemas.py           # source-of-truth Pydantic v2 DTOs (exists)
-│   ├── main.py              # future FastAPI application
-│   ├── services/            # intake, extraction, gate, versioning, evaluator, explanations
-│   └── tests/               # pure-engine, contracts, provenance, API tests
-├── frontend/                # future React/Vite app
-├── datasets/synthetic/      # future source PDFs, gold labels, personas
-└── eval/                    # future reproducible benchmark runner and reports
-```
-
-- All HTTP JSON payloads must conform to `backend/schemas.py` and `SHARED_CONTRACTS.md`.
-- The frontend must not invent counters, inferred eligibility, source provenance states, or status colors. Render returned typed data.
-- API response models should use FastAPI `response_model` so invalid server payloads fail visibly.
-- Store source PDFs immutably; store their extraction records and page anchors separately.
-- Use consistent ID strings and document hashes; `SourceEvidence.page_number` is **1-based**; boxes are normalized `[0,1]`, origin top-left.
-- Backend rule evaluation, precedence, gate checks, and numerical guards must each be independently testable pure functions where possible.
-- Poll the event endpoint for the first version. Don't build a real-time WebSocket stack unless polling fails to meet the visual/demo requirement.
-- Apply changes atomically with optimistic `expected_workspace_revision` to prevent stale overwrites.
-- Errors must use `ApiError`, not arbitrary English exceptions returned in HTTP 200.
-
-## 5. Rules of implementation
-
-### Decision aggregation
-
-For an applicant on a given date: unresolved conflict in a relevant effective rule → `CONFLICT`; otherwise any proven failing applicable condition → `FAIL`; otherwise any missing required value → `UNKNOWN`; otherwise all checked applicable conditions pass → `PASS`. If **no** applicable rules are verified, return `UNKNOWN`, not `PASS`. Preserve all per-rule checks and evidence.
-
-### Amendment precedence
-
-`ADD` adds a scoped rule; `REPLACE` targets one specific existing `rule_id`; `REVOKE` targets one existing `rule_id`. No global "latest PDF wins" shortcut. Effective ranges are **start-inclusive, end-exclusive**. Reject or hold for review ambiguous targets, incompatible scope, overlapping applicable rules, references pointing to another scheme, dates that fail chronology checks, and any unsupported condition type. A later unrelated amendment must not erase earlier changes.
-
-### Change classification
-
-Only overall `FAIL → PASS` is `IMPROVED`, and only `PASS → FAIL` is `WORSENED`. A transition involving `UNKNOWN` or `CONFLICT` that needs investigation is `REVIEW_REQUIRED`. Same overall status is `UNCHANGED`, even when a subordinate rule value changes; surface rule-level details separately. `changed` counts transitions where the **overall** status actually differs. Never turn a condition-level PASS into an official overall approval.
-
-### Language / TTS
-
-Construct a verified set of source-backed facts. Generate Hindi text through a controlled template or Sarvam-105B, then validate that its named rules, values, dates, and decision status match the engine output. **Block** audio when the guard fails; show the guarded template instead. Do not send unsupported sentences to the synthesizer.
-
-## 6. Definition of done and tests
-
-Before calling any feature finished:
-
-- A failing test was written or reproduced, then passed after the change.
-- At least one synthetic original + corrigendum pair runs through the actual parser/rule pipeline.
-- Unsupported or unauthenticated document input cannot modify a committed rule set.
-- `UNKNOWN` and `CONFLICT` are visibly distinct from `FAIL`.
-- The animation reflects backend `ImpactEvent.transitions`, not hardcoded demo numbers.
-- PDF evidence opens the correct page, with exact highlighting only when extraction coordinates are verified.
-- Offline replay exercises the same local evaluator as online mode.
-- UI distinguishes real live processing, cached extraction, and offline replay.
-- A scorecard is not shown until a reproducible evaluation produced it.
-- Tests run on **native Windows Python 3.12**, not only another developer's OS/Python version.
-
-## 7. Agent collaboration and status updates
-
-- Read `PROGRESS.md` first to avoid duplicating work or claiming planned files exist.
-- Make small, reviewable commits and update `PROGRESS.md` with done/in-progress/blocked changes and test commands/results.
-- If you change a public field, enum, endpoint, or default, update **both** `backend/schemas.py` and `SHARED_CONTRACTS.md` in the same change; consider whether to bump `SCHEMA_VERSION`.
-- Separate **VERIFIED** (documented or observed), **ASSUMED** (design decision), and **UNTESTED** (needs proof) in technical notes.
-- For external integrations, use environment variables; never commit `.env`, credentials, authentic documents containing sensitive data, audio samples with personal information, or internal API responses.
-- If unsure, prefer one truthful working vertical slice over a partially mocked multi-screen product.
+- The preserved v1 schema is this repository's tested **1.1.0**, not the kit's older copy. V1 services import it explicitly.
+- V1 APIs and all earlier tests remain operational. Archived v1 documentation is under `docs/legacy-v1/`.
+- `backend/storage.py` is an existing module; do not replace it with a directory. V2 storage is added separately.
+- Native local development is the deployment scope for this migration slice. Do not register a hosted Site or send data to a cloud deployment.

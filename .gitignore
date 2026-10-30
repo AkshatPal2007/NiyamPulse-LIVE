@@ -17,3 +17,5 @@ dist/
 *.sqlite3-shm
 var/
 tmp/
+pytest-cache-files-*/
+*.tsbuildinfo

@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 
 from backend.demo_fixtures import demo_pdfs
-from backend.schemas import ApplicantProfile
+from backend.legacy_schemas_v1 import ApplicantProfile
 from backend.storage import Store, WorkspaceConfig
 
 

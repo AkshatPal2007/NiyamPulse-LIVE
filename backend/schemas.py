@@ -1,51 +1,84 @@
-"""NiyamPulse LIVE: v1 shared API/data contracts.
+"""NiyamPulse v2 shared DTOs: exam monitoring, subscriptions, alerts, impact.
 
-Python 3.12 + Pydantic 2.x. This module defines contracts, NOT business
-logic. In particular it does not certify sources, resolve amendments,
-evaluate rules, or generate verified explanations.
+Native target: Python 3.12 + Pydantic v2. Models are contracts, not implemented
+crawlers, policy decisions, eligibility evaluators, or notification delivery.
 
-Run a schema smoke check from the repository root:
-    py -3.12 -m pip install "pydantic>=2.9,<3"
+Existing v1 contracts are retained in backend.legacy_schemas_v1 and re-exported
+at the bottom for gradual migration. Do NOT delete the legacy file until the
+Codex repository has passed its migration tests.
+
     py -3.12 -m backend.schemas
 """
-
 from __future__ import annotations
 
 from datetime import date
 from enum import Enum
-from typing import Annotated, Literal, TypeAlias
+from typing import Annotated, Literal
 
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, HttpUrl, model_validator
+from pydantic import (
+    AwareDatetime, BaseModel, ConfigDict, Field, HttpUrl,
+    field_validator, model_validator,
+)
 
-SCHEMA_VERSION = "1.1.0"
-DISCLAIMER = "Decision support only; not official approval."
+from . import legacy_schemas_v1 as legacy
 
-
-class ContractModel(BaseModel):
-    """Reject undeclared properties and normalize incidental whitespace."""
-
-    model_config = ConfigDict(
-        extra="forbid",
-        validate_assignment=True,
-        str_strip_whitespace=True,
-        use_enum_values=False,
-    )
-
+SCHEMA_VERSION = "2.0.0"
+DISCLAIMER = "Decision support only; not official eligibility or application confirmation."
 
 Id = Annotated[str, Field(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9][A-Za-z0-9._:-]*$")]
-DocCode = Annotated[str, Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*$")]
 Sha256 = Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
-NonEmpty = Annotated[str, Field(min_length=1)]
+NonEmpty = Annotated[str, Field(min_length=1, max_length=500)]
 
 
-class DecisionStatus(str, Enum):
-    PASS = "PASS"
-    FAIL = "FAIL"
+class StrictModel(BaseModel):
+    model_config = ConfigDict(extra="forbid", validate_assignment=True, str_strip_whitespace=True)
+
+
+class Audience(str, Enum):
+    SCHOOL = "SCHOOL"
+    ENGINEERING = "ENGINEERING"
+    GENERAL = "GENERAL"
+
+
+class ExamFamily(str, Enum):
+    SCHOOL_ENTRANCE = "SCHOOL_ENTRANCE"
+    DEFENCE_ENTRANCE = "DEFENCE_ENTRANCE"
+    ENGINEERING_POSTGRAD = "ENGINEERING_POSTGRAD"
+    GOVERNMENT_RECRUITMENT = "GOVERNMENT_RECRUITMENT"
+
+
+class Language(str, Enum):
+    EN = "en"
+    HI = "hi"
+
+
+class SourceKind(str, Enum):
+    OFFICIAL_WEB_LISTING = "OFFICIAL_WEB_LISTING"
+    ADMIN_UPLOAD = "ADMIN_UPLOAD"
+    LOCAL_DEMO_FIXTURE = "LOCAL_DEMO_FIXTURE"
+
+
+class SourceReadiness(str, Enum):
+    LISTING_VERIFIED_ADAPTER_UNTESTED = "LISTING_VERIFIED_ADAPTER_UNTESTED"
+    ADAPTER_TESTED = "ADAPTER_TESTED"
+    DISABLED = "DISABLED"
+
+
+class NoticeType(str, Enum):
+    ORIGINAL = "ORIGINAL"
+    CORRIGENDUM = "CORRIGENDUM"
+    DEADLINE = "DEADLINE"
+    EXAM_DATE = "EXAM_DATE"
+    ADMIT_CARD = "ADMIT_CARD"
+    ANSWER_KEY = "ANSWER_KEY"
+    RESULT = "RESULT"
+    SYLLABUS = "SYLLABUS"
+    APPLICATION_CORRECTION = "APPLICATION_CORRECTION"
+    INFORMATIONAL = "INFORMATIONAL"
     UNKNOWN = "UNKNOWN"
-    CONFLICT = "CONFLICT"
 
 
-class RuleType(str, Enum):
+class RuleChangeType(str, Enum):
     MINIMUM_MARKS = "minimum_marks"
     MAXIMUM_INCOME = "maximum_income_inr"
     APPLICATION_DEADLINE = "application_deadline"
@@ -53,530 +86,564 @@ class RuleType(str, Enum):
     REQUIRED_DOCUMENTS = "required_documents"
 
 
-class DocumentKind(str, Enum):
-    ORIGINAL = "ORIGINAL"
-    CORRIGENDUM = "CORRIGENDUM"
-
-
-class ExtractionState(str, Enum):
-    PENDING = "PENDING"
-    COMPLETE = "COMPLETE"
-    FAILED = "FAILED"
-
-
-class IntakeState(str, Enum):
-    RECEIVED = "RECEIVED"
-    EXTRACTING = "EXTRACTING"
-    NEEDS_REVIEW = "NEEDS_REVIEW"
-    READY_TO_APPLY = "READY_TO_APPLY"
-    APPLIED = "APPLIED"
-    QUARANTINED = "QUARANTINED"
-    FAILED = "FAILED"
-
-
-class GateCheckStatus(str, Enum):
-    PASS = "PASS"
-    FAIL = "FAIL"
-    UNKNOWN = "UNKNOWN"
-
-
-class SourceMatchState(str, Enum):
+class DocumentTrust(str, Enum):
+    MATCHED_CONFIGURED_SOURCE = "MATCHED_CONFIGURED_SOURCE"  # NOT authenticity certification
     UNVERIFIED = "UNVERIFIED"
-    MATCHED_CONFIGURED_SOURCE = "MATCHED_CONFIGURED_SOURCE"
     MISMATCH = "MISMATCH"
 
 
-class GateRecommendation(str, Enum):
-    MANUAL_REVIEW = "MANUAL_REVIEW"
-    QUARANTINE = "QUARANTINE"
-    ALLOW_REVIEW = "ALLOW_REVIEW"
-
-
-class ReviewState(str, Enum):
-    PENDING = "PENDING"
+class ReviewStatus(str, Enum):
+    DETECTED = "DETECTED"
+    PROCESSING = "PROCESSING"
+    NEEDS_REVIEW = "NEEDS_REVIEW"
     APPROVED = "APPROVED"
+    QUARANTINED = "QUARANTINED"
     REJECTED = "REJECTED"
+    FAILED = "FAILED"
 
 
-class ChangeOperation(str, Enum):
-    ADD = "ADD"
-    REPLACE = "REPLACE"
-    REVOKE = "REVOKE"
+class ApplicationStatus(str, Enum):
+    UNKNOWN = "UNKNOWN"
+    INTERESTED = "INTERESTED"
+    PLANNING_TO_APPLY = "PLANNING_TO_APPLY"
+    APPLIED_SELF_REPORTED = "APPLIED_SELF_REPORTED"
+    NO_LONGER_INTERESTED = "NO_LONGER_INTERESTED"
 
 
-class ImpactDirection(str, Enum):
-    IMPROVED = "IMPROVED"
-    WORSENED = "WORSENED"
-    UNCHANGED = "UNCHANGED"
-    REVIEW_REQUIRED = "REVIEW_REQUIRED"
+class Topic(str, Enum):
+    ALL = "ALL"
+    REGISTRATION = "REGISTRATION"
+    ELIGIBILITY = "ELIGIBILITY"
+    EXAM_SCHEDULE = "EXAM_SCHEDULE"
+    ADMIT_CARD = "ADMIT_CARD"
+    ANSWER_KEY = "ANSWER_KEY"
+    RESULTS = "RESULTS"
+    SYLLABUS = "SYLLABUS"
+    OTHER = "OTHER"
 
 
-class SourceBox(ContractModel):
-    """Normalized PDF page box; origin top-left, values in [0, 1]."""
+class RecipientRelevance(str, Enum):
+    GENERAL_UPDATE = "GENERAL_UPDATE"
+    PERSONAL_IMPACT = "PERSONAL_IMPACT"
+    POSSIBLE_IMPACT = "POSSIBLE_IMPACT"
+    UNKNOWN = "UNKNOWN"
 
-    x0: float = Field(ge=0, le=1)
-    y0: float = Field(ge=0, le=1)
-    x1: float = Field(ge=0, le=1)
-    y1: float = Field(ge=0, le=1)
+
+class DeliveryState(str, Enum):
+    QUEUED = "QUEUED"
+    DELIVERED = "DELIVERED"
+    READ = "READ"
+    FAILED = "FAILED"
+    SUPPRESSED = "SUPPRESSED"
+
+
+class ExamCatalogEntry(StrictModel):
+    exam_id: Id
+    display_name: NonEmpty
+    exam_family: ExamFamily
+    audiences: list[Audience] = Field(min_length=1)
+    organizer: NonEmpty
+    description: str = Field(default="", max_length=1200)
+    active: bool = True
+    source_ids: list[Id] = Field(default_factory=list)
+
+    @field_validator("audiences")
+    @classmethod
+    def audiences_unique(cls, value: list[Audience]) -> list[Audience]:
+        if len(set(value)) != len(value):
+            raise ValueError("audiences must be unique")
+        return value
+
+
+class ExamCycle(StrictModel):
+    cycle_id: Id
+    exam_id: Id
+    year: int = Field(ge=2020, le=2100)
+    phase: str | None = Field(default=None, max_length=100)  # e.g. session 1 / paper 2
+    display_name: NonEmpty
+    is_active: bool = True
+
+
+class OfficialSource(StrictModel):
+    source_id: Id
+    organization: NonEmpty
+    source_kind: Literal["OFFICIAL_WEB_LISTING"] = "OFFICIAL_WEB_LISTING"
+    listing_url: HttpUrl
+    allowed_hosts: list[str] = Field(min_length=1)
+    readiness: SourceReadiness = SourceReadiness.LISTING_VERIFIED_ADAPTER_UNTESTED
+    adapter_name: str | None = None
+    enabled: bool = False
+    poll_interval_minutes: int = Field(default=60, ge=15, le=10080)
+    notes: str = Field(default="", max_length=2000)
+
+    @field_validator("allowed_hosts")
+    @classmethod
+    def no_wildcard_hosts(cls, hosts: list[str]) -> list[str]:
+        normalized = [h.strip().lower() for h in hosts]
+        if not all(h and "*" not in h and ":" not in h and "/" not in h for h in normalized):
+            raise ValueError("allowed_hosts require exact hostname entries")
+        if len(set(normalized)) != len(normalized):
+            raise ValueError("allowed_hosts must be unique")
+        return normalized
 
     @model_validator(mode="after")
-    def bounds_are_ordered(self) -> "SourceBox":
-        if self.x1 <= self.x0 or self.y1 <= self.y0:
-            raise ValueError("source box must have positive width and height")
+    def validate_source_readiness(self) -> "OfficialSource":
+        if self.enabled and self.readiness != SourceReadiness.ADAPTER_TESTED:
+            raise ValueError("web source cannot be enabled until its adapter is tested")
+        if self.enabled and not self.adapter_name:
+            raise ValueError("enabled web source requires adapter_name")
+        if self.listing_url.host.lower() not in self.allowed_hosts:
+            raise ValueError("listing host must be present in allowed_hosts")
         return self
 
 
-class SourceEvidence(ContractModel):
-    """Literal anchor into an immutable extraction of a particular PDF."""
-
-    document_id: Id
-    document_sha256: Sha256
-    extraction_id: Id
-    page_number: int = Field(ge=1, description="1-based PDF page index")
-    literal_quote: NonEmpty = Field(max_length=4000)
-    start_char: int | None = Field(default=None, ge=0)
-    end_char: int | None = Field(default=None, ge=1)
-    boxes: list[SourceBox] = Field(default_factory=list)
+class UserProfileV2(StrictModel):
+    user_id: Id
+    preferred_language: Language = Language.EN
+    display_name: str | None = Field(default=None, max_length=120)
+    # All personal relevance inputs are optional and self-reported.
+    date_of_birth: date | None = None
+    marks_percent: float | None = Field(default=None, ge=0, le=100)
+    annual_household_income_inr: int | None = Field(default=None, ge=0)
+    available_document_codes: list[str] = Field(default_factory=list)
+    document_inventory_complete: bool = False
+    personalization_opt_in: bool = False
+    created_at: AwareDatetime
+    updated_at: AwareDatetime
 
     @model_validator(mode="after")
-    def offset_pair_is_valid(self) -> "SourceEvidence":
+    def opt_in_for_personal_data(self) -> "UserProfileV2":
+        if not self.personalization_opt_in and any([
+            self.date_of_birth is not None, self.marks_percent is not None,
+            self.annual_household_income_inr is not None,
+            bool(self.available_document_codes), self.document_inventory_complete,
+        ]):
+            raise ValueError("personal relevance fields require explicit personalization_opt_in")
+        return self
+
+
+class ExamSubscription(StrictModel):
+    subscription_id: Id
+    user_id: Id
+    cycle_id: Id
+    topics: list[Topic] = Field(default_factory=lambda: [Topic.ALL], min_length=1)
+    application_status: ApplicationStatus = ApplicationStatus.UNKNOWN
+    notifications_enabled: bool = True
+    subscribed_at: AwareDatetime
+
+    @field_validator("topics")
+    @classmethod
+    def validate_topics(cls, topics: list[Topic]) -> list[Topic]:
+        if len(set(topics)) != len(topics):
+            raise ValueError("topics must be unique")
+        if Topic.ALL in topics and len(topics) > 1:
+            raise ValueError("ALL topic must not be combined with other topics")
+        return topics
+
+
+class EvidenceAnchor(StrictModel):
+    document_id: Id
+    document_sha256: Sha256
+    page_number: int = Field(ge=1)
+    literal_quote: str = Field(min_length=1, max_length=4000)
+    # Coordinates optional, never fabricated; 1-based page numbers.
+    start_char: int | None = Field(default=None, ge=0)
+    end_char: int | None = Field(default=None, ge=1)
+    extraction_id: Id | None = None
+
+    @model_validator(mode="after")
+    def offsets_consistent(self) -> "EvidenceAnchor":
         if (self.start_char is None) != (self.end_char is None):
-            raise ValueError("start_char and end_char must both be set or both absent")
+            raise ValueError("both offsets required or neither")
         if self.start_char is not None and self.end_char <= self.start_char:
             raise ValueError("end_char must be greater than start_char")
         return self
 
 
-class SourceDocument(ContractModel):
-    document_id: Id
-    workspace_id: Id
-    filename: NonEmpty
-    sha256: Sha256
-    kind: DocumentKind
-    language: Literal["en", "hi", "mixed", "other", "unknown"] = "unknown"
-    published_on: date | None = None
-    acquired_at: AwareDatetime
+class DetectedNotice(StrictModel):
+    notice_id: Id
+    cycle_id: Id
+    source_id: Id | None = None
+    source_kind: SourceKind
+    title: NonEmpty
+    notice_type: NoticeType = NoticeType.UNKNOWN
     source_url: HttpUrl | None = None
-    issuing_authority: str | None = None
-    reference_number: str | None = None
-    extraction_state: ExtractionState = ExtractionState.PENDING
-    extraction_id: Id | None = None
-    intake_state: IntakeState = IntakeState.RECEIVED
-    acquisition_channel: Literal["UPLOAD", "LOCAL_WATCH"] = "UPLOAD"
-    processing_mode: Literal["LOCAL_PDF", "CACHED_EXTRACTION"] = "LOCAL_PDF"
-    synthetic: bool = False
-    diagnostics: list[str] = Field(default_factory=list)
-    source_gate: SourceGateResult | None = None
-    review_state: ReviewState = ReviewState.PENDING
-    reviewed_by: str | None = None
-    reviewed_at: AwareDatetime | None = None
-
-
-class RuleBase(ContractModel):
-    rule_id: Id
-    scheme_id: Id
-    scope_key: NonEmpty = "all_applicants"
-    effective_from: date
-    effective_until: date | None = None  # Exclusive boundary
-    evidence: list[SourceEvidence] = Field(min_length=1)
-
-    @model_validator(mode="after")
-    def validity_window(self) -> "RuleBase":
-        if self.effective_until is not None and self.effective_until <= self.effective_from:
-            raise ValueError("effective_until must be after effective_from")
-        return self
-
-
-class MinimumMarksRule(RuleBase):
-    rule_type: Literal["minimum_marks"] = "minimum_marks"
-    min_marks_percent: float = Field(ge=0, le=100)
-
-
-class MaximumIncomeRule(RuleBase):
-    rule_type: Literal["maximum_income_inr"] = "maximum_income_inr"
-    max_annual_income_inr: int = Field(ge=0)
-
-
-class ApplicationDeadlineRule(RuleBase):
-    rule_type: Literal["application_deadline"] = "application_deadline"
-    deadline_on: date
-
-
-class AgeBoundsRule(RuleBase):
-    rule_type: Literal["age_bounds"] = "age_bounds"
-    min_age_years: int = Field(ge=0, le=130)
-    max_age_years: int = Field(ge=0, le=130)
-    age_as_of: date
-
-    @model_validator(mode="after")
-    def age_range_is_valid(self) -> "AgeBoundsRule":
-        if self.max_age_years < self.min_age_years:
-            raise ValueError("max_age_years must be >= min_age_years")
-        return self
-
-
-class RequiredDocumentsRule(RuleBase):
-    rule_type: Literal["required_documents"] = "required_documents"
-    required_document_codes: list[DocCode] = Field(min_length=1)
-
-    @model_validator(mode="after")
-    def unique_codes(self) -> "RequiredDocumentsRule":
-        if len(self.required_document_codes) != len(set(self.required_document_codes)):
-            raise ValueError("required_document_codes must be unique")
-        return self
-
-
-RuleDefinition: TypeAlias = Annotated[
-    MinimumMarksRule
-    | MaximumIncomeRule
-    | ApplicationDeadlineRule
-    | AgeBoundsRule
-    | RequiredDocumentsRule,
-    Field(discriminator="rule_type"),
-]
-
-
-class GateCheck(ContractModel):
-    check_id: Id
-    status: GateCheckStatus
-    detail: NonEmpty
-
-
-class SourceGateResult(ContractModel):
-    """Source matched != proven authentic. Service layer must enforce gates."""
-
-    source_match: SourceMatchState
-    recommendation: GateRecommendation
-    checks: list[GateCheck] = Field(min_length=1)
-    checked_at: AwareDatetime
-
-    @model_validator(mode="after")
-    def gate_is_consistent(self) -> "SourceGateResult":
-        if any(c.status == GateCheckStatus.FAIL for c in self.checks):
-            if self.recommendation != GateRecommendation.QUARANTINE:
-                raise ValueError("failed gate check requires QUARANTINE")
-        if self.recommendation == GateRecommendation.ALLOW_REVIEW:
-            if self.source_match != SourceMatchState.MATCHED_CONFIGURED_SOURCE:
-                raise ValueError("ALLOW_REVIEW requires matched configured source")
-            if any(c.status != GateCheckStatus.PASS for c in self.checks):
-                raise ValueError("ALLOW_REVIEW requires every check to PASS")
-        return self
-
-
-class AmendmentChange(ContractModel):
-    change_id: Id
-    operation: ChangeOperation
-    target_rule_id: Id | None = None
-    proposed_rule: RuleDefinition | None = None
-    effective_from: date
-    amendment_evidence: list[SourceEvidence] = Field(min_length=1)
-
-    @model_validator(mode="after")
-    def operation_payload_matches(self) -> "AmendmentChange":
-        if self.operation == ChangeOperation.ADD:
-            if self.target_rule_id is not None or self.proposed_rule is None:
-                raise ValueError("ADD requires proposed_rule and no target_rule_id")
-        elif self.operation == ChangeOperation.REPLACE:
-            if self.target_rule_id is None or self.proposed_rule is None:
-                raise ValueError("REPLACE requires target_rule_id and proposed_rule")
-        elif self.operation == ChangeOperation.REVOKE:
-            if self.target_rule_id is None or self.proposed_rule is not None:
-                raise ValueError("REVOKE requires target_rule_id and no proposed_rule")
-        if self.proposed_rule is not None and self.proposed_rule.effective_from != self.effective_from:
-            raise ValueError("proposed rule and change effective_from must match")
-        return self
-
-
-class AmendmentRecord(ContractModel):
-    amendment_id: Id
-    workspace_id: Id
-    original_document_id: Id
-    corrigendum_document_id: Id
+    document_sha256: Sha256
     published_on: date | None = None
-    intake_state: IntakeState = IntakeState.RECEIVED
-    review_state: ReviewState = ReviewState.PENDING
-    source_gate: SourceGateResult | None = None
-    changes: list[AmendmentChange] = Field(default_factory=list)
-    reviewed_by: str | None = None
-    reviewed_at: AwareDatetime | None = None
+    first_seen_at: AwareDatetime
+    trust: DocumentTrust = DocumentTrust.UNVERIFIED
+    review_status: ReviewStatus = ReviewStatus.DETECTED
+    evidence: list[EvidenceAnchor] = Field(default_factory=list)
+    reference_numbers: list[str] = Field(default_factory=list)
+    revision: int = Field(default=0, ge=0)
+    topics: list[Topic] = Field(default_factory=lambda: [Topic.OTHER], min_length=1)
+    processing_mode: Literal["SOURCE_EXCERPT", "OFFLINE_REPLAY", "SARVAM_105B", "NEEDS_EXTRACTION"] = "NEEDS_EXTRACTION"
+    diagnostics: list[str] = Field(default_factory=list)
+    requires_rule_validation: bool = False
 
     @model_validator(mode="after")
-    def applied_requires_review_and_gate(self) -> "AmendmentRecord":
-        if self.intake_state == IntakeState.APPLIED:
-            if self.review_state != ReviewState.APPROVED:
-                raise ValueError("APPLIED requires approved review")
-            if self.source_gate is None or self.source_gate.recommendation != GateRecommendation.ALLOW_REVIEW:
-                raise ValueError("APPLIED requires passing source gate")
+    def url_required_for_web_notice(self) -> "DetectedNotice":
+        if self.source_kind == SourceKind.OFFICIAL_WEB_LISTING:
+            if self.source_url is None or self.source_id is None:
+                raise ValueError("web notice requires source_url and source_id")
+        if self.trust == DocumentTrust.MISMATCH and self.review_status == ReviewStatus.APPROVED:
+            raise ValueError("mismatched source cannot be approved")
         return self
 
 
-class ApplicantProfile(ContractModel):
-    applicant_id: Id
-    workspace_id: Id
-    display_name: NonEmpty
-    scope_keys: list[NonEmpty] = Field(default_factory=lambda: ["all_applicants"])
-    marks_percent: float | None = Field(default=None, ge=0, le=100)
-    annual_household_income_inr: int | None = Field(default=None, ge=0)
-    date_of_birth: date | None = None
-    planned_submission_on: date | None = None
-    available_document_codes: list[DocCode] = Field(default_factory=list)
-    document_inventory_complete: bool = False
-    updated_at: AwareDatetime
-
-
-class RuleCheck(ContractModel):
-    rule_id: Id
-    rule_type: RuleType
-    status: DecisionStatus
-    reason_code: NonEmpty
-    observed_value: str | None = None
-    expected_value: NonEmpty
-    evidence: list[SourceEvidence] = Field(default_factory=list)
-
-
-class ApplicantDecision(ContractModel):
-    applicant_id: Id
-    as_of_date: date
-    status: DecisionStatus
-    checks: list[RuleCheck] = Field(default_factory=list)
-    engine_version: NonEmpty
-    rule_set_sha256: Sha256
-    disclaimer: Literal["Decision support only; not official approval."] = DISCLAIMER
-
-
-class DecisionTransition(ContractModel):
-    applicant_id: Id
-    before: ApplicantDecision
-    after: ApplicantDecision
-    direction: ImpactDirection
+class NoticeChange(StrictModel):
+    change_id: Id
+    notice_id: Id
+    rule_type: RuleChangeType
+    operation: Literal["ADD", "REPLACE", "REVOKE"]
+    target_rule_id: Id | None = None
+    # The actual validated rule object is the legacy closed-set RuleDefinition;
+    # the exam cycle maps to legacy RuleBase.scheme_id.
+    proposed_rule: legacy.RuleDefinition | None = None
+    effective_from: date | None = None
+    evidence: list[EvidenceAnchor] = Field(min_length=1)
 
     @model_validator(mode="after")
-    def same_applicant(self) -> "DecisionTransition":
-        if self.before.applicant_id != self.applicant_id or self.after.applicant_id != self.applicant_id:
-            raise ValueError("before/after must refer to the same applicant")
-        if self.direction == ImpactDirection.IMPROVED:
-            if (self.before.status, self.after.status) != (DecisionStatus.FAIL, DecisionStatus.PASS):
-                raise ValueError("IMPROVED means an overall FAIL -> PASS transition")
-        if self.direction == ImpactDirection.WORSENED:
-            if (self.before.status, self.after.status) != (DecisionStatus.PASS, DecisionStatus.FAIL):
-                raise ValueError("WORSENED means an overall PASS -> FAIL transition")
-        if self.direction == ImpactDirection.UNCHANGED and self.before.status != self.after.status:
-            raise ValueError("UNCHANGED requires identical overall statuses")
+    def consistent_change(self) -> "NoticeChange":
+        if self.operation in {"REPLACE", "REVOKE"} and not self.target_rule_id:
+            raise ValueError("REPLACE and REVOKE require target_rule_id")
+        if self.operation in {"ADD", "REPLACE"} and self.proposed_rule is None:
+            raise ValueError("ADD/REPLACE require proposed_rule")
+        if self.operation == "REVOKE" and self.proposed_rule is not None:
+            raise ValueError("REVOKE must not have proposed_rule")
+        if self.operation == "ADD" and self.target_rule_id is not None:
+            raise ValueError("ADD must not target an existing rule")
+        if self.proposed_rule is not None:
+            if self.proposed_rule.rule_type != self.rule_type.value:
+                raise ValueError("rule_type must match proposed_rule")
+            if self.effective_from != self.proposed_rule.effective_from:
+                raise ValueError("effective_from must match proposed_rule")
         return self
 
 
-class ImpactCounts(ContractModel):
-    evaluated: int = Field(ge=0)
-    changed: int = Field(ge=0)
-    improved: int = Field(ge=0)
-    worsened: int = Field(ge=0)
-    review_required: int = Field(ge=0)
-    unchanged: int = Field(ge=0)
+class NoticeReviewDecision(StrictModel):
+    notice_id: Id
+    reviewer_id: Id
+    action: Literal["APPROVE", "QUARANTINE", "REJECT"]
+    reason: NonEmpty
+    reviewed_at: AwareDatetime
+    expected_revision: int = Field(ge=0)
+
+
+class NoticeUpdate(StrictModel):
+    update_id: Id
+    cycle_id: Id
+    notice_id: Id
+    notice_type: NoticeType
+    published_at: AwareDatetime
+    summary_en: str = Field(min_length=1, max_length=2500)
+    summary_hi: str | None = Field(default=None, max_length=2500)
+    evidence: list[EvidenceAnchor] = Field(min_length=1)
+    rule_changes: list[NoticeChange] = Field(default_factory=list)
+    approved_by: Id
+    approved_at: AwareDatetime
+    evaluation_version: str = Field(min_length=1)
+    rule_set_sha256: Sha256 | None = None
+
+
+class RecipientMatch(StrictModel):
+    match_id: Id
+    update_id: Id
+    user_id: Id
+    subscription_id: Id
+    relevance: RecipientRelevance
+    reason_codes: list[str] = Field(min_length=1)
+    before: legacy.DecisionStatus | None = None
+    after: legacy.DecisionStatus | None = None
+    # Only populate before/after when checks have actually run on the
+    # applicable scoped rule set; never fabricate official eligibility.
 
     @model_validator(mode="after")
-    def partition_is_consistent(self) -> "ImpactCounts":
-        if self.improved + self.worsened + self.review_required + self.unchanged != self.evaluated:
-            raise ValueError("direction counts must sum to evaluated")
-        if self.changed > self.evaluated:
-            raise ValueError("changed cannot exceed evaluated")
+    def has_decision_pair_or_neither(self) -> "RecipientMatch":
+        if (self.before is None) != (self.after is None):
+            raise ValueError("before and after decision must both be present or both absent")
+        if self.relevance == RecipientRelevance.PERSONAL_IMPACT and self.before is None:
+            raise ValueError("PERSONAL_IMPACT requires computed before/after decisions")
+        if self.relevance == RecipientRelevance.PERSONAL_IMPACT and self.before == self.after:
+            raise ValueError("PERSONAL_IMPACT requires a status change")
         return self
 
 
-class ImpactEvent(ContractModel):
-    event_id: Id
-    workspace_id: Id
-    amendment_id: Id
-    event_kind: Literal["PREVIEW", "APPLIED"]
-    occurred_at: AwareDatetime
-    before_rule_set_sha256: Sha256
-    after_rule_set_sha256: Sha256
-    counts: ImpactCounts
-    transitions: list[DecisionTransition] = Field(default_factory=list)
+class InAppNotification(StrictModel):
+    notification_id: Id
+    user_id: Id
+    match_id: Id
+    update_id: Id
+    cycle_id: Id
+    delivery: DeliveryState = DeliveryState.QUEUED
+    headline: NonEmpty
+    body: str = Field(min_length=1, max_length=1600)
+    language: Language
+    created_at: AwareDatetime
+    delivered_at: AwareDatetime | None = None
+    read_at: AwareDatetime | None = None
+    official_source_url: HttpUrl | None = None
+    evidence: list[EvidenceAnchor] = Field(min_length=1)
+    disclaimer: Literal["Decision support only; not official eligibility or application confirmation."] = DISCLAIMER
 
     @model_validator(mode="after")
-    def counts_match_transitions(self) -> "ImpactEvent":
-        if len(self.transitions) != self.counts.evaluated:
-            raise ValueError("transitions length must match counts.evaluated")
-        directions = [t.direction for t in self.transitions]
-        for value, count in (
-            (ImpactDirection.IMPROVED, self.counts.improved),
-            (ImpactDirection.WORSENED, self.counts.worsened),
-            (ImpactDirection.REVIEW_REQUIRED, self.counts.review_required),
-            (ImpactDirection.UNCHANGED, self.counts.unchanged),
-        ):
-            if directions.count(value) != count:
-                raise ValueError(f"count for {value.value} differs from transitions")
-        actual_changed = sum(t.before.status != t.after.status for t in self.transitions)
-        if actual_changed != self.counts.changed:
-            raise ValueError("changed must equal count of overall status transitions")
+    def delivery_timestamps(self) -> "InAppNotification":
+        if self.delivery in {DeliveryState.DELIVERED, DeliveryState.READ} and not self.delivered_at:
+            raise ValueError("DELIVERED/READ requires delivered_at")
+        if self.delivery == DeliveryState.READ and not self.read_at:
+            raise ValueError("READ requires read_at")
+        if self.read_at and self.delivered_at and self.read_at < self.delivered_at:
+            raise ValueError("read_at cannot precede delivered_at")
         return self
 
 
-class EvidenceSentence(ContractModel):
-    sentence_id: Id
-    text: NonEmpty
-    supporting_rule_ids: list[Id] = Field(min_length=1)
-    evidence: list[SourceEvidence] = Field(min_length=1)
+class AdminDashboardTotals(StrictModel):
+    monitored_sources: int = Field(ge=0)
+    active_exam_cycles: int = Field(ge=0)
+    registered_users: int = Field(ge=0)
+    active_subscriptions: int = Field(ge=0)
+    notices_detected: int = Field(ge=0)
+    notices_pending_review: int = Field(ge=0)
+    approved_updates: int = Field(ge=0)
+    matched_recipients: int = Field(ge=0)
+    notifications_delivered: int = Field(ge=0)
+    notifications_failed: int = Field(ge=0)
+    notifications_read: int = Field(default=0, ge=0)
+    # All values must come from database aggregates; no placeholder metrics.
 
 
-class VerifiedExplanation(ContractModel):
-    applicant_id: Id
-    language: Literal["en", "hi"]
-    sentences: list[EvidenceSentence] = Field(min_length=1)
-    decision_rule_set_sha256: Sha256
-    numeric_and_date_tokens_checked: bool = False
-    audio_asset_id: Id | None = None
-    disclaimer: Literal["Decision support only; not official approval."] = DISCLAIMER
-
-    @model_validator(mode="after")
-    def audio_requires_numeric_guard(self) -> "VerifiedExplanation":
-        if self.audio_asset_id is not None and not self.numeric_and_date_tokens_checked:
-            raise ValueError("audio cannot be attached until numeric/date validation passes")
-        return self
+class AdminDashboardResponse(StrictModel):
+    schema_version: Literal["2.0.0"] = SCHEMA_VERSION
+    generated_at: AwareDatetime
+    totals: AdminDashboardTotals
+    recent_updates: list[NoticeUpdate] = Field(default_factory=list)
+    source_health: dict[str, str] = Field(default_factory=dict)
+    source_checks: list[SourceHealth] = Field(default_factory=list)
+    by_cycle: list[CycleTotals] = Field(default_factory=list)
+    synthetic_demo: bool = True
+    monitor_running: bool = False
 
 
-class WorkspaceState(ContractModel):
-    schema_version: Literal["1.1.0"] = SCHEMA_VERSION
-    workspace_id: Id
-    revision: int = Field(ge=0)
-    documents: list[SourceDocument] = Field(default_factory=list)
-    amendments: list[AmendmentRecord] = Field(default_factory=list)
-    active_rules: list[RuleDefinition] = Field(default_factory=list)
-    profiles: list[ApplicantProfile] = Field(default_factory=list)
-    decisions: list[ApplicantDecision] = Field(default_factory=list)
-    latest_event: ImpactEvent | None = None
-    scheme_id: Id | None = None
-    as_of_date: date | None = None
-    synthetic: bool = False
-    watcher: WatcherHealth = Field(default_factory=lambda: WatcherHealth())
+class CatalogResponse(StrictModel):
+    schema_version: Literal["2.0.0"] = SCHEMA_VERSION
+    exams: list[ExamCatalogEntry]
+    cycles: list[ExamCycle]
+    coverage: dict[str, Literal["CATALOG_ONLY", "SOURCE_CONFIGURED", "LIVE_MONITORED"]] = Field(default_factory=dict)
 
 
-class TimelineSnapshot(ContractModel):
-    schema_version: Literal["1.1.0"] = SCHEMA_VERSION
-    workspace_id: Id
-    as_of_date: date
-    # When provided, exclude documents not known by this timestamp.
-    known_at: AwareDatetime | None = None
-    rule_set_sha256: Sha256
-    effective_rules: list[RuleDefinition] = Field(default_factory=list)
-    decisions: list[ApplicantDecision] = Field(default_factory=list)
-
-
-class EventFeedResponse(ContractModel):
-    schema_version: Literal["1.1.0"] = SCHEMA_VERSION
-    workspace_id: Id
-    events: list[ImpactEvent] = Field(default_factory=list)
+class NotificationsResponse(StrictModel):
+    schema_version: Literal["2.0.0"] = SCHEMA_VERSION
+    notifications: list[InAppNotification]
     next_cursor: str | None = None
+    unread_count: int = Field(default=0, ge=0)
 
 
-class ExplanationRequest(ContractModel):
-    applicant_id: Id
-    language: Literal["en", "hi"] = "hi"
-    question: str | None = Field(default=None, max_length=500)
-    expected_rule_set_sha256: Sha256
-
-
-class EvaluationMetric(ContractModel):
-    metric_id: Id
-    correct: int = Field(ge=0)
-    total: int = Field(ge=0)
-    # Percentage is derived in frontend (correct/total); no invented score.
-
-    @model_validator(mode="after")
-    def numerator_lte_denominator(self) -> "EvaluationMetric":
-        if self.correct > self.total:
-            raise ValueError("correct cannot exceed total")
-        return self
-
-
-class EvaluationScorecard(ContractModel):
-    schema_version: Literal["1.1.0"] = SCHEMA_VERSION
-    run_id: Id
-    dataset_id: Id
-    synthetic: Literal[True] = True
-    completed_at: AwareDatetime
-    pipeline_revision: NonEmpty
-    metrics: list[EvaluationMetric] = Field(min_length=1)
-    baseline_metrics: list[EvaluationMetric] = Field(default_factory=list)
-    notes: list[str] = Field(default_factory=list)
-
-
-class ApplyAmendmentRequest(ContractModel):
-    expected_workspace_revision: int = Field(ge=0)
-    reviewed_by: NonEmpty
-    confirm_source_review: Literal[True]
-
-
-class PreviewAmendmentResponse(ContractModel):
-    schema_version: Literal["1.1.0"] = SCHEMA_VERSION
-    amendment: AmendmentRecord
-    impact: ImpactEvent | None = None
-    can_apply: bool
-    blockers: list[str] = Field(default_factory=list)
-
-
-class ApplyAmendmentResponse(ContractModel):
-    schema_version: Literal["1.1.0"] = SCHEMA_VERSION
-    workspace_revision: int = Field(ge=0)
-    event: ImpactEvent
-
-
-class ImportDocumentResponse(ContractModel):
-    schema_version: Literal["1.1.0"] = SCHEMA_VERSION
-    document: SourceDocument
-    amendment_id: Id | None = None
-
-
-class TranscriptResponse(ContractModel):
-    schema_version: Literal["1.1.0"] = SCHEMA_VERSION
-    language: str
-    transcript: str
-    provider: Literal["sarvam_saaras_v4", "offline_demo"]
-
-
-class ApiError(ContractModel):
-    error_code: Id
+class ApiError(StrictModel):
+    code: NonEmpty
     message: NonEmpty
     request_id: Id | None = None
     details: dict[str, str] = Field(default_factory=dict)
 
 
-class HealthResponse(ContractModel):
-    status: Literal["ok"] = "ok"
-    schema_version: Literal["1.1.0"] = SCHEMA_VERSION
+class SubscriptionCreate(StrictModel):
+    cycle_id: Id
+    topics: list[Topic] = Field(default_factory=lambda: [Topic.ALL], min_length=1)
+    application_status: ApplicationStatus = ApplicationStatus.INTERESTED
+
+    @field_validator("topics")
+    @classmethod
+    def topics_valid(cls, value):
+        return ExamSubscription.validate_topics(value)
 
 
-class WatcherHealth(ContractModel):
-    enabled: bool = False
-    running: bool = False
-    watched_directory: str | None = None
-    last_scan_at: AwareDatetime | None = None
+class SubscriptionPatch(StrictModel):
+    topics: list[Topic] | None = Field(default=None, min_length=1)
+    application_status: ApplicationStatus | None = None
+    notifications_enabled: bool | None = None
+
+    @field_validator("topics")
+    @classmethod
+    def topics_valid(cls, value):
+        return ExamSubscription.validate_topics(value) if value is not None else value
+
+
+class ProfilePatch(StrictModel):
+    preferred_language: Language | None = None
+    display_name: str | None = Field(default=None, max_length=120)
+    personalization_opt_in: bool | None = None
+    date_of_birth: date | None = None
+    marks_percent: float | None = Field(default=None, ge=0, le=100)
+    annual_household_income_inr: int | None = Field(default=None, ge=0)
+    available_document_codes: list[str] | None = None
+    document_inventory_complete: bool | None = None
+
+
+class DemoSessionRequest(StrictModel):
+    persona: Literal["school", "engineering", "operator"]
+
+
+class SessionResponse(StrictModel):
+    access_token: NonEmpty
+    user_id: Id
+    display_name: str
+    role: Literal["USER", "ADMIN"]
+    demo_mode: Literal[True] = True
+    expires_at: AwareDatetime
+
+
+class SourceHealth(StrictModel):
+    source_id: Id
+    status: Literal["DISABLED", "NEVER_CHECKED", "LIVE_OK", "ERROR", "OFFLINE_REPLAY"] = "DISABLED"
+    last_attempt_at: AwareDatetime | None = None
+    last_success_at: AwareDatetime | None = None
     last_error: str | None = None
+    last_http_status: int | None = None
+    last_new_notices: int = Field(default=0, ge=0)
+    total_notices: int = Field(default=0, ge=0)
+    robots_status: str | None = None
+    next_due_at: AwareDatetime | None = None
 
 
-class ExtractedPage(ContractModel):
-    # Frozen extraction text must retain newlines and incidental whitespace.
-    model_config = ConfigDict(extra="forbid", frozen=True, str_strip_whitespace=False)
+class CycleTotals(StrictModel):
+    cycle_id: Id
+    subscriptions: int = Field(ge=0)
+    updates: int = Field(ge=0)
+    notifications: int = Field(ge=0)
+
+
+class MonitorCheckRequest(StrictModel):
+    dry_run: bool = True
+
+
+class MonitorCheckResult(StrictModel):
+    schema_version: Literal["2.0.0"] = SCHEMA_VERSION
+    source_id: Id
+    checked_at: AwareDatetime
+    dry_run: bool
+    mode: Literal["LIVE", "OFFLINE_REPLAY"]
+    listing_sha256: Sha256 | None = None
+    discovered_links: int = Field(default=0, ge=0)
+    created_notices: int = Field(default=0, ge=0)
+    duplicates: int = Field(default=0, ge=0)
+    unmapped: list[str] = Field(default_factory=list)
+    errors: list[str] = Field(default_factory=list)
+
+
+class ExtractedFact(StrictModel):
+    kind: Literal["ANNOUNCEMENT", "APPLICATION_DEADLINE", "EXAM_DATE", "RULE_CANDIDATE", "UNSUPPORTED_REQUIREMENT"]
     page_number: int = Field(ge=1)
-    text: str
-    width: float = Field(gt=0)
-    height: float = Field(gt=0)
+    literal_quote: str = Field(min_length=12, max_length=600)
+    date_value: date | None = None
 
 
-class DocumentExtraction(ContractModel):
-    document_id: Id
-    document_sha256: Sha256
+class SarvamCandidate(StrictModel):
+    cycle_id: Id
+    notice_type: NoticeType
+    topics: list[Topic] = Field(min_length=1, max_length=7)
+    facts: list[ExtractedFact] = Field(min_length=1, max_length=6)
+    requires_rule_validation: bool
+
+
+class AnalysisRequest(StrictModel):
+    expected_revision: int = Field(ge=0)
+
+
+class NoticeAnalysis(StrictModel):
+    analysis_id: Id
+    notice_id: Id
+    provider: Literal["SARVAM_105B"] = "SARVAM_105B"
+    model: str = "sarvam-105b"
+    prompt_version: str
+    guard_version: str | None = None
+    created_at: AwareDatetime
+    status: Literal["VALIDATED", "GUARD_REJECTED"]
+    cache_hit: bool = False
+    input_sha256: Sha256
     extraction_id: Id
-    extractor_version: NonEmpty
-    pages: list[ExtractedPage] = Field(min_length=1)
+    pages_processed: list[int]
+    total_pages: int = Field(ge=1)
+    coverage_complete: bool
+    candidate: SarvamCandidate | None = None
+    summary_en: str | None = Field(default=None, max_length=2500)
+    summary_hi: str | None = Field(default=None, max_length=2500)
+    summary_method: Literal["EXTRACTIVE_EN_CONTROLLED_HI"] = "EXTRACTIVE_EN_CONTROLLED_HI"
+    evidence: list[EvidenceAnchor] = Field(default_factory=list)
+    diagnostics: list[str] = Field(default_factory=list)
 
 
-class ReviewOriginalRequest(ApplyAmendmentRequest):
-    """Explicitly review a verified original; bootstrap only an empty rule history."""
+class SarvamHealth(StrictModel):
+    status: Literal["NOT_CONFIGURED", "NOT_TESTED", "LIVE_OK", "ERROR"]
+    model: str = "sarvam-105b"
+    budget_limit_paise: int = Field(ge=0)
+    reserved_paise: int = Field(ge=0)
+    requests: int = Field(ge=0)
+    prompt_tokens: int = Field(ge=0)
+    completion_tokens: int = Field(ge=0)
+    last_success_at: AwareDatetime | None = None
+    last_error_code: str | None = None
+    budget_note: str = "Conservative local reservations, not provider-billed spend."
+
+
+class OcrResult(StrictModel):
+    notice_id: Id
+    job_id: str | None = None
+    status: Literal["PENDING", "COMPLETED"]
+    cache_hit: bool
+    pages: int = Field(ge=0)
+    extraction_id: Id | None = None
+    provider: Literal["SARVAM_VISION"] = "SARVAM_VISION"
+
+
+class NoticeDetail(StrictModel):
+    analysis: NoticeAnalysis | None = None
+    notice: DetectedNotice
+    extracted_pages: list[str]
+    source_listing_url: HttpUrl | None = None
+    observed_link_title: str
+    extraction_version: NonEmpty
+
+
+class InboxItem(StrictModel):
+    notification: InAppNotification
+    match: RecipientMatch
+    update: NoticeUpdate
+    notice: DetectedNotice
+
+
+class PlatformStatus(StrictModel):
+    schema_version: Literal["2.0.0"] = SCHEMA_VERSION
+    demo_mode: bool
+    sarvam_status: Literal["NOT_CONFIGURED", "NOT_TESTED", "LIVE_OK", "ERROR"]
+    disclaimer: str = DISCLAIMER
+
+
+# Gradual migration: the legacy names remain importable for code that already
+# uses `from backend.schemas import ApplicantProfile`, etc. New code should use
+# the explicit v2 names for v2 concepts and the shared legacy rule engine DTOs.
+SourceEvidence = legacy.SourceEvidence
+SourceDocument = legacy.SourceDocument
+RuleDefinition = legacy.RuleDefinition
+DecisionStatus = legacy.DecisionStatus
+ApplicantDecision = legacy.ApplicantDecision
+AmendmentRecord = legacy.AmendmentRecord
+ApplicantProfile = legacy.ApplicantProfile
+ImpactEvent = legacy.ImpactEvent
+VerifiedExplanation = legacy.VerifiedExplanation
 
 
 if __name__ == "__main__":
-    import json
+    for model in (
+        ExamCatalogEntry, ExamCycle, OfficialSource, UserProfileV2,
+        ExamSubscription, DetectedNotice, NoticeChange, NoticeUpdate,
+        RecipientMatch, InAppNotification, AdminDashboardResponse,
+        CatalogResponse, NotificationsResponse,
+    ):
+        _ = model.model_json_schema()
+    print(f"NiyamPulse v{SCHEMA_VERSION}: Pydantic imports and JSON Schema generation OK")
 
-    print(f"NiyamPulse schemas v{SCHEMA_VERSION}: import OK")
-    print(json.dumps(WorkspaceState.model_json_schema(), indent=2)[:200])
+
+def __getattr__(name: str):
+    """Forward remaining v1 symbols without changing their payloads."""
+    if not name.startswith("_") and hasattr(legacy, name):
+        return getattr(legacy, name)
+    raise AttributeError(name)

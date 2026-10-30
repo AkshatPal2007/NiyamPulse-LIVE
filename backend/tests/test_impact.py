@@ -2,7 +2,7 @@ from datetime import date, datetime, timezone
 import itertools
 import unittest
 
-from backend.schemas import DecisionStatus as S, ImpactDirection as D, ImpactEvent
+from backend.legacy_schemas_v1 import DecisionStatus as S, ImpactDirection as D, ImpactEvent
 from backend.services.impact import classify_transition, preview_impact
 from backend.services.rule_engine import EngineError
 from backend.tests.support import make_rule, profile, verified

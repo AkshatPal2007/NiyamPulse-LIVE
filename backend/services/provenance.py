@@ -1,7 +1,7 @@
 """Pure checks of literal evidence, values, source configuration and chronology."""
 from datetime import timedelta, timezone
 
-from backend.schemas import (
+from backend.legacy_schemas_v1 import (
     DocumentKind, GateCheck, GateCheckStatus as Check, GateRecommendation,
     ReviewState, SourceGateResult, SourceMatchState,
 )

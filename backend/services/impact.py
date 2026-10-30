@@ -3,7 +3,7 @@ from collections import Counter
 from collections.abc import Collection, Sequence
 from datetime import date, datetime
 
-from backend.schemas import (
+from backend.legacy_schemas_v1 import (
     ApplicantProfile, DecisionStatus, DecisionTransition, ImpactCounts,
     ImpactDirection, ImpactEvent, RuleDefinition,
 )

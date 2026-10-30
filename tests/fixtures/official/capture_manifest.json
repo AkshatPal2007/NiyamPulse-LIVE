@@ -1,0 +1,38 @@
+{
+  "nta-listing": {
+    "url": "https://jeemain.nta.nic.in/public-notices/",
+    "status": 200,
+    "content_type": "text/html; charset=UTF-8",
+    "location": null,
+    "sha256": "219d085ec6c1b3c548edf71ddb0dea7000dc402c31de4dfc0ae5fe76065e0d22",
+    "bytes": 84905,
+    "fetched_at": "2026-10-30T17:22:14.961413+00:00"
+  },
+  "upsc-listing": {
+    "url": "https://www.upsc.gov.in/examinations/active-exams",
+    "status": 200,
+    "content_type": "text/html; charset=utf-8",
+    "location": null,
+    "sha256": "2d3c528c764b2b8b5826f451c29fc53d82a31c41cc410a4f10b0ee2b9d543561",
+    "bytes": 37779,
+    "fetched_at": "2026-10-30T17:22:15.616272+00:00"
+  },
+  "nta-robots": {
+    "url": "https://jeemain.nta.nic.in/robots.txt",
+    "status": 200,
+    "content_type": "text/plain; charset=utf-8",
+    "location": null,
+    "sha256": "9311bab30d8b5d05f5fa5563a251b8c96b8470873bb77c62d3d17c146d7acab7",
+    "bytes": 67,
+    "fetched_at": "2026-10-30T17:22:14.621882+00:00"
+  },
+  "upsc-robots": {
+    "url": "https://www.upsc.gov.in/robots.txt",
+    "status": 302,
+    "content_type": "text/html; charset=iso-8859-1",
+    "location": "HTTPS://www.upsc.gov.in/",
+    "sha256": "b60af571b16112e41528796c46d70ea9280b2a6b2b2746127bf8add805ae7c98",
+    "bytes": 208,
+    "fetched_at": "2026-10-30T17:22:15.288358+00:00"
+  }
+}

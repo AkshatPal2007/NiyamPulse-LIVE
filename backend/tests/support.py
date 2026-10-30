@@ -1,7 +1,7 @@
 """Explicitly synthetic test builders; these do not certify real sources."""
-from backend.schemas import ApplicantProfile, SourceEvidence
+from backend.legacy_schemas_v1 import ApplicantProfile, SourceEvidence
 from pydantic import TypeAdapter
-from backend.schemas import RuleDefinition
+from backend.legacy_schemas_v1 import RuleDefinition
 
 
 def evidence():

@@ -43,7 +43,7 @@ class SyntheticPipelineTests(unittest.TestCase):
 
     def test_engine_still_requires_verification_for_parsed_fixture_rules(self):
         from backend.services.rule_engine import evaluate_applicant
-        from backend.schemas import DecisionStatus
+        from backend.legacy_schemas_v1 import DecisionStatus
         case = load_case(FIXTURE_ROOT / "marks_relaxed_en.json")
         result = evaluate_applicant(case.profiles[0], case.rules, scheme_id=case.scheme_id, as_of_date=case.as_of_date)
         self.assertEqual(result.status, DecisionStatus.UNKNOWN)

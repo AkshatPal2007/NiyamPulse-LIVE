@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 import hashlib
 import unittest
 
-from backend.schemas import SourceDocument, DocumentKind
+from backend.legacy_schemas_v1 import SourceDocument, DocumentKind
 from backend.services.pdf_intake import extract_pdf, parse_notice, verify_evidence
 from backend.tests.pdf_support import notice_text, pdf_bytes
 

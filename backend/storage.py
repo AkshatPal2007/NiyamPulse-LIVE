@@ -11,7 +11,7 @@ import sqlite3
 
 from pydantic import Field, TypeAdapter
 
-from backend.schemas import (
+from backend.legacy_schemas_v1 import (
     AmendmentRecord, ApplicantDecision, ApplicantProfile, ContractModel, DocumentExtraction,
     EventFeedResponse, Id, ImpactEvent, Sha256, SourceDocument, WorkspaceState,
 )
@@ -157,7 +157,7 @@ class Store:
         return AmendmentRecord.model_validate_json(row[0])
 
     def history(self, row):
-        from backend.schemas import RuleDefinition
+        from backend.legacy_schemas_v1 import RuleDefinition
         return validated_rules(TypeAdapter(list[RuleDefinition]).validate_json(row["history"]))
 
     def state(self, workspace_id):

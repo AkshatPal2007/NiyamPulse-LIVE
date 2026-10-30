@@ -4,7 +4,7 @@ import unittest
 
 from pydantic import ValidationError
 
-from backend.schemas import ApplicantProfile, DecisionStatus as S
+from backend.legacy_schemas_v1 import ApplicantProfile, DecisionStatus as S
 from backend.services.rule_engine import (
     EngineError, aggregate_status, evaluate_applicant, rule_fingerprint,
     rule_set_fingerprint,
@@ -135,7 +135,7 @@ class RuleEngineTests(unittest.TestCase):
 
     def test_schema_rejects_unsupported_rules_and_fractional_income(self):
         from pydantic import TypeAdapter
-        from backend.schemas import RuleDefinition
+        from backend.legacy_schemas_v1 import RuleDefinition
         payload = make_rule().model_dump(mode="json")
         payload["rule_type"] = "caste_exception"
         with self.assertRaises(ValidationError):

@@ -1,289 +1,352 @@
-# SHARED_CONTRACTS.md — Frontend ↔ Backend Handshake
+# SHARED_CONTRACTS.md — NiyamPulse v2 Frontend ↔ Backend Handshake
 
-**Project:** NiyamPulse LIVE  
-**Contract version:** `1.1.0`
+**Contract version:** `2.0.0` · **Target:** Python 3.12, Pydantic v2, FastAPI + React/TypeScript. The first informational vertical slice is **implemented locally**; remaining integrations are listed below. Models in `backend/schemas.py` are canonical for field names and enums. Keep old `/api/v1` stable during migration; add `/api/v2` instead of silently changing existing payloads.
 
-**Source of truth for DTO shapes:** `backend/schemas.py` (Pydantic v2)  
-**Target runtime:** Python 3.12 (native Windows), FastAPI; React + TypeScript + Vite frontend  
-**Status:** **PHASE 2 LOCAL BACKEND IMPLEMENTED** — intake, original review, preview/apply, evidence access, timeline and event polling exist; frontend and sponsor integrations remain planned.
+## 1. The new user journey
 
-**Phase 2 implementation note (2026-10-30):** The native Windows backend now uses the Phase 1 engine with actual PyMuPDF extraction and SQLite transactions. The parser supports a declared notice template only; unsupported input is held for review. Version 1.1.0 adds explicit original review, PDF/extraction access, document diagnostics and watcher health. See `README.md` for a reproducible synthetic walkthrough. No Sarvam call, frontend, coordinate highlighting or evaluation scorecard is claimed.
+1. User sees an exam catalog organized by `SCHOOL` / `ENGINEERING` / `GENERAL` and subscribes to any number of `ExamCycle`s (e.g., `jee-main:2027:s1`, `neet-ug:2027`, `nda:2027:i`, `gate:2027`, `upsc-ese:2027`, `ssc-je:2026`).
+2. A configured official-source watcher periodically checks a listing, discovers a **new URL or changed content hash**, records the evidence, and creates `DetectedNotice` with `review_status=DETECTED`.
+3. The ingestion layer classifies the notice. `SourceGate` verifies configured source lineage; the operator reviews unverified or ambiguous changes. For MVP, **all notifications require review approval**.
+4. Approved informational notices route to subscribers by exam cycle + topics. Approved amendments affecting one of five supported rule types also cause deterministic profile evaluation; missing facts result in `UNKNOWN`, not guesses.
+5. An `InAppNotification` is persisted per recipient (`update_id`, `user_id` unique); user sees evidence/source link, personalized relevance, language and disclaimer. Admin sees only actual aggregates.
+6. Existing PDF upload is an **operator fallback/testing tool**; ordinary subscribers never have to upload documents.
 
-> This is the cross-team agreement. The frontend may animate data received from the backend, but may not calculate eligibility, infer source trust, invent impact counts, or alter effective rules.
+## 2. Major concept distinctions
 
-## 1. Transport and conventions
-
-| Concern | v1 contract |
-|---|---|
-| Base URL (development) | `http://127.0.0.1:8000/api/v1` |
-| Allowed dev origin | `http://localhost:5173` (configure CORS explicitly) |
-| Content type | `application/json; charset=utf-8`, except PDF/audio uploads and streamed media |
-| Naming | JSON `snake_case`; TypeScript may use the same names to avoid accidental drift |
-| API version | `/api/v1` path plus `schema_version: "1.1.0"` on versioned top-level state/results |
-| Timestamp | ISO 8601 with offset; server emits UTC `Z`, e.g. `2026-10-30T12:00:00Z` |
-| Date-only values | `YYYY-MM-DD`, interpreted as scheme-local calendar dates; default demo zone `Asia/Kolkata` |
-| IDs | Opaque stable strings, not array indexes or filenames |
-| Currency | Integer Indian rupees (`annual_household_income_inr`) |
-| Marks | Numeric percentage `0..100` (`marks_percent`) |
-| Pages | **1-based** `page_number` |
-| PDF bounding boxes | Normalized coordinates `0..1`; top-left origin; `x0,y0,x1,y1` |
-| Missing data | `null`/unknown is distinct from zero or empty; document inventory uses `document_inventory_complete` |
-| HTTP errors | Non-2xx with typed `ApiError`: `{ "error_code", "message", "request_id", "details" }` |
-| Ordering / concurrency | Use `revision` and `expected_workspace_revision` on apply; reject mismatches with HTTP 409 |
-| Events | Poll initially; backend guarantees event IDs are stable, event feed returns an opaque cursor |
-
-### Global states
-
-- `DecisionStatus`: `PASS | FAIL | UNKNOWN | CONFLICT`.
-- `IntakeState`: `RECEIVED | EXTRACTING | NEEDS_REVIEW | READY_TO_APPLY | APPLIED | QUARANTINED | FAILED`.
-- `SourceMatchState`: `UNVERIFIED | MATCHED_CONFIGURED_SOURCE | MISMATCH`.
-- `GateRecommendation`: `MANUAL_REVIEW | QUARANTINE | ALLOW_REVIEW`.
-- `ReviewState`: `PENDING | APPROVED | REJECTED`.
-- `ChangeOperation`: `ADD | REPLACE | REVOKE`.
-- `ImpactDirection`: `IMPROVED | WORSENED | UNCHANGED | REVIEW_REQUIRED`.
-
-The UI must show this exact disclaimer alongside overall outcomes:
-
-> **Decision support only; not official approval.**
-
-### Decision meanings
-
-- `PASS`: all *verified, applicable* closed-set rule checks pass and at least one exists. **Not** official approval.
-- `FAIL`: at least one relevant condition demonstrably fails, with no overriding unresolved conflict.
-- `UNKNOWN`: a required profile value, rule source, or applicable rule set is missing.
-- `CONFLICT`: competing operative rules or unresolved source/precedence evidence prevents a dependable result.
-
-Aggregation precedence in the engine: `CONFLICT` > `FAIL` > `UNKNOWN` > `PASS`. If zero rules are verified and applicable, aggregate status is `UNKNOWN`.
-
-Only a transition from overall `FAIL` to overall `PASS` is called `IMPROVED`, and only `PASS` to `FAIL` is `WORSENED`. Other uncertain transitions are `REVIEW_REQUIRED`. For unchanged overall status use `UNCHANGED`. `ImpactCounts.changed` means **number of profiles with changed overall status**; the per-rule details may change even when that count does not.
-
-## 2. HTTP endpoints and implementation status
-
-Health, workspace, document intake, original review, evidence access, amendment preview/apply, timeline and event routes are implemented. Explanation, speech and audio routes remain planned. Evaluation currently returns typed HTTP 404 because no evaluation run exists. Each route below is relative to `/api/v1`.
-
-| Method / route | Body / query | Response | Side effects |
-|---|---|---|---|
-| `GET /health` | None | `{ "status": "ok", "schema_version": "1.1.0" }` | None |
-| `GET /workspaces/{workspace_id}` | None | `WorkspaceState` | None |
-| `POST /workspaces/{workspace_id}/documents` | `multipart/form-data`: `file` PDF; `kind` (`ORIGINAL`/`CORRIGENDUM`); optional `source_url` | `ImportDocumentResponse`, HTTP **202** | Queue local extraction; does **not** apply rules |
-| `GET /workspaces/{workspace_id}/amendments/{amendment_id}/preview` | None | `PreviewAmendmentResponse` | Calculate **PREVIEW** impact, never persist active rules |
-| `POST /workspaces/{workspace_id}/amendments/{amendment_id}/apply` | `ApplyAmendmentRequest` | `ApplyAmendmentResponse` | Atomically review+apply approved amendment and emit impact event; **409** on stale revision |
-| `GET /workspaces/{workspace_id}/timeline` | `as_of_date=YYYY-MM-DD`; optional `known_at=<ISO timestamp>` | `TimelineSnapshot` | None |
-| `GET /workspaces/{workspace_id}/events` | Optional `cursor=<opaque>` | `EventFeedResponse` | None |
-| `POST /workspaces/{workspace_id}/explanations` | `ExplanationRequest` | `VerifiedExplanation` | May cache verified explanation; never changes decision |
-| `POST /workspaces/{workspace_id}/speech/transcribe` | `multipart/form-data`: `audio` (max 30s REST demonstration) | `TranscriptResponse` | May call Sarvam Saaras |
-| `GET /assets/{audio_asset_id}` | None | Audio bytes (`audio/mpeg` or actual supported MIME) | None |
-| `GET /workspaces/{workspace_id}/evaluations/latest` | None | `EvaluationScorecard` or HTTP **404** if no test run exists | None |
-
-For import, an HTTP **202** means accepted for processing, **not** that OCR, authority checks, or rule application succeeded. Poll `GET /workspaces/{workspace_id}` for the latest intake state. For a scanned PDF with no usable OCR, keep it in `NEEDS_REVIEW`/`FAILED` and report a diagnostic; never produce fabricated rules.
-
-### Apply preconditions (all must hold)
-
-1. Amendment exists in the requested workspace, and its target original is explicitly identified.
-2. The source gate returns `ALLOW_REVIEW` with **all checks passing** and `MATCHED_CONFIGURED_SOURCE`.
-3. Human explicitly requests application (`confirm_source_review: true` and nonempty `reviewed_by`).
-4. Candidate rule text, numerical values, evidence anchor, explicit target ID, scope, and effective dates passed validation.
-5. No unresolved source conflict or unsupported rule type remains.
-6. The supplied `expected_workspace_revision` equals the stored revision.
-7. The server completes source review, version update, evaluation snapshot, and event persist **in one database transaction**, then returns the new revision.
-
-`MATCHED_CONFIGURED_SOURCE` means a configured source-channel/reference check passed; it **does not certify cryptographic authenticity**. In a demonstration using synthetic PDFs, the UI must say so.
-
-### Phase 2 additions
-
-| Method / route | Request | Response / behavior |
+| Concept | Meaning | Important constraint |
 |---|---|---|
-| `POST /workspaces/{workspace_id}/documents/{document_id}/review` | `ReviewOriginalRequest` (same explicit revision/name/confirmation fields as apply) | `WorkspaceState`; human-reviewed original bootstraps only an empty rule history; 409 if blocked/stale |
-| `GET /workspaces/{workspace_id}/documents/{document_id}/pdf` | None | Immutable original PDF bytes, `application/pdf`; the client may add `#page=<1-based page>` |
-| `GET /workspaces/{workspace_id}/documents/{document_id}/extraction` | None | `DocumentExtraction` with hash, extraction ID/version and frozen `ExtractedPage[]` |
+| `ExamCatalogEntry` | JEE Main, NEET UG, NDA, GATE, ESE, SSC JE, etc. | Not tied to a particular year |
+| `ExamCycle` | JEE Main **2027 Session 1** vs Session 2 | All notices/subscriptions scoped to correct cycle |
+| `OfficialSource` | Configured official listing page/adapter | An official-looking hostname ≠ authenticated PDF |
+| `DetectedNotice` | Discovered source item with immutable evidence | Not an approved alert |
+| `NoticeUpdate` | Reviewed, publishable announcement | Informational updates allowed without a RuleChange |
+| `NoticeChange` | A supported *rule* amendment | Five types only; reference and evidence required |
+| `ExamSubscription` | User opts into an exam cycle and topics | User may subscribe without sensitive profile data |
+| `RecipientMatch` | Engine-computed relevance to one subscriber | `PERSONAL_IMPACT` only when actual status transition computed |
+| `InAppNotification` | Persisted user-visible delivery event | Source link and evidence required |
+| `AdminDashboardTotals` | Database-derived operator metrics | No invented counts |
 
-Additional v1.1 fields:
+Use `SourceKind.LOCAL_DEMO_FIXTURE` for demo playback, and show `SYNTHETIC DEMO` on screen. Do **not** portray it as a fetched official update.
 
-- `SourceDocument`: `intake_state`, server-owned `acquisition_channel` (`UPLOAD` / `LOCAL_WATCH`), `processing_mode` (`LOCAL_PDF` / `CACHED_EXTRACTION`), server-configured `synthetic`, `diagnostics[]`, `source_gate`, `review_state`, `reviewed_by`, `reviewed_at`.
-- `WorkspaceState`: `scheme_id`, `as_of_date`, `synthetic`, and `watcher: WatcherHealth` (`enabled`, observed `running`, `watched_directory`, `last_scan_at`, `last_error`). Defaults preserve an empty state; configured backend responses supply actual scheme/date.
-- `HealthResponse`: `status: "ok"` plus `schema_version: "1.1.0"`.
-- `ExtractedPage`: 1-based `page_number`, exact untrimmed page `text`, `width` and `height` in PDF points. `DocumentExtraction` binds these pages to `document_id`, `document_sha256`, `extraction_id`, and `extractor_version`.
+## 3. General HTTP conventions
 
-Workspace source configuration, profile loading and demo setup are local operator actions, not HTTP trust flags. An upload `source_url` is acquisition metadata only. Source matching requires configured content hashes or the server's actual configured local-watch origin. Duplicate content preserves the first acquisition; a later rename/URL/channel does not silently upgrade trust. The local watcher accepts corrigenda only; original notices use upload + explicit original review. Live health is reported only while the observer and worker are running.
+- Prefix: `/api/v2`. JSON UTF-8. ISO 8601 timestamps with timezone offset (`Z` allowed). Dates `YYYY-MM-DD`. Pagination: opaque `next_cursor`.
+- API errors: `{ "code": "...", "message": "...", "request_id": "...", "details": {} }`, response HTTP status appropriate to cause. Use `409 CONFLICT` for stale admin revision/idempotency collision; `422` for malformed schema; `403` for wrong role; `404` for missing/private resource; `503` for source/Sarvam unavailable. No silent success.
+- `schema_version="2.0.0"` on list/summary responses. `Content-Type: application/json`.
+- Authentication: routes named `/me` require logged-in user, other user IDs must be derived from token/session on backend—not accepted from untrusted client. `/admin` routes require operator role.
+- **Public read vs admin:** Catalog is public; source controls/review/dashboard are admin-only; personal data/notifications private. Never expose other users' names/DOB in admin aggregate responses.
+- Source note: matching an allowlisted URL means `MATCHED_CONFIGURED_SOURCE`, never "officially authenticated". Avoid trusting AI-generated source attributions.
+- Write operations: use server-generated IDs and deterministic idempotency key. Any amendment application must be revision-checked and atomic.
 
-The current parser checks all text against the declared v1 notice grammar and compares candidate values, scope, IDs, operations and dates with a fresh parse of the immutable extraction. Evidence includes both the condition and effective-date passage. It is not a general scholarship-language interpreter. Unsupported/ambiguous input never applies a supported subset. Scanned PDFs without embedded text are `NEEDS_REVIEW` with an OCR diagnostic. Failed PDF extraction is `FAILED`. All gates are rerun inside the apply transaction.
+## 4. Planned endpoints — phase 1
 
-Source bytes and extraction snapshots are immutable SQLite records; SHA-256 integrity is rechecked on access/apply. Caches are keyed by PDF hash plus extractor version. Boxes are empty in v1.1 until coordinate verification exists; do not highlight arbitrary rectangles. Background processing resumes pending intake on startup. Import and metadata processing never change active decisions/revision.
+| Method | Path | Request | Response | Who |
+|---|---|---|---|---|
+| GET | `/api/v2/catalog` | optional `audience`, `search` | `CatalogResponse` | public |
+| GET | `/api/v2/me/subscriptions` | none | `ExamSubscription[]` | user |
+| POST | `/api/v2/me/subscriptions` | `{cycle_id, topics, application_status}` | `ExamSubscription` | user |
+| PATCH | `/api/v2/me/subscriptions/{subscription_id}` | `{topics?, application_status?, notifications_enabled?}` | `ExamSubscription` | owner |
+| DELETE | `/api/v2/me/subscriptions/{subscription_id}` | none | 204 | owner |
+| GET | `/api/v2/me/notifications` | `cursor?, limit?, unread_only?` | `NotificationsResponse` | user |
+| POST | `/api/v2/me/notifications/{notification_id}/read` | none | `InAppNotification` | owner |
+| GET | `/api/v2/me/profile` | none | `UserProfileV2` | user |
+| PATCH | `/api/v2/me/profile` | opt-in and optional self-reported fields | `UserProfileV2` | user |
+| DELETE | `/api/v2/me/profile/personalization` | none | 204 | user |
+| GET | `/api/v2/admin/dashboard` | none | `AdminDashboardResponse` | admin |
+| GET | `/api/v2/admin/sources` | none | `OfficialSource[]` with health separately | admin |
+| GET | `/api/v2/admin/notices` | `review_status?, cycle_id?, cursor?` | `DetectedNotice[]` | admin |
+| POST | `/api/v2/admin/notices/{notice_id}/review` | `NoticeReviewDecision` | reviewed `DetectedNotice`, then update created if approved | admin |
+| POST | `/api/v2/admin/monitor/{source_id}/check` | `dry_run=true` (default) | `MonitorCheckResult` (to be designed before implementation) | admin |
+| GET | `/api/v2/admin/updates/{update_id}/recipients` | `cursor?` | `RecipientMatch[]`, privacy-restricted | admin |
 
-Original review and amendment apply each use `BEGIN IMMEDIATE`, expected revision validation and one transaction for review metadata, rule history, verification attestations, decisions and commit snapshot; amendment apply also persists exactly one event. Review names are operator assertions, not authenticated identities. Known-at views select the latest committed knowledge snapshot at/before the timestamp and exclude sources acquired later; effective dates remain scheme-local dates. No historical profile-edit API exists yet.
+**Implementation status:** all phase-1 subscription/profile/inbox/admin endpoints above are implemented in this repository. The monitor check response is now defined below. The original supplied kit was contract-only; this is the merged implementation contract. Personalized v2 rule-change publication remains unimplemented. The Sarvam text/OCR increment is specified in section 12.
 
-Event cursors are opaque, signed, workspace-bound and stable across service restart. The feed is append-only and paginated at 100 events; clients deduplicate by event ID. Typed `ApiError` responses cover validation, missing routes/resources, stale/blocked review, database failures and unavailable scorecards.
+## 5. Example payloads (SYNTHETIC; illustrate shape, not real alerts)
 
-## 3. Canonical data structures
-
-The names below correspond to Pydantic classes in `backend/schemas.py`. Generate TypeScript interfaces from the FastAPI OpenAPI document once the backend exists; do not independently reinterpret the classes.
-
-| Shape | Important fields / invariant |
-|---|---|
-| `SourceDocument` | Immutable `document_id`, `sha256`, source URL, issuing authority, reference number, published date, acquisition timestamp, kind, OCR state |
-| `SourceEvidence` | `document_id`, `document_sha256`, `extraction_id`, 1-based page, `literal_quote`; optional exact text offsets and PDF boxes |
-| `RuleDefinition` | Discriminated union by `rule_type`, all with `rule_id`, `scheme_id`, `scope_key`, `effective_from`, exclusive `effective_until`, `evidence[]` |
-| `MinimumMarksRule` | `min_marks_percent` numeric |
-| `MaximumIncomeRule` | `max_annual_income_inr` integer |
-| `ApplicationDeadlineRule` | `deadline_on` ISO date |
-| `AgeBoundsRule` | `min_age_years`, `max_age_years`, **`age_as_of`** anchor date |
-| `RequiredDocumentsRule` | `required_document_codes[]` nonempty and unique |
-| `SourceGateResult` | Source match, recommendation, individually reported `checks[]` and check time |
-| `AmendmentChange` | `operation`, `target_rule_id`, `proposed_rule`, `effective_from`, `amendment_evidence[]` |
-| `AmendmentRecord` | Original/corrigendum IDs, gate result, review state, intake state, reviewed by/at, changes[] |
-| `ApplicantProfile` | Marks, integer income, birth date, planned submission date, available documents and inventory completeness |
-| `RuleCheck` | One rule's status, expected/observed values, reason code, source evidence |
-| `ApplicantDecision` | Overall status and checks; `engine_version`, `rule_set_sha256`, disclaimer |
-| `DecisionTransition` | One applicant's before/after `ApplicantDecision` plus `ImpactDirection` |
-| `ImpactEvent` | `PREVIEW` or `APPLIED`, before/after rule hashes, backend-calculated counts, transitions[] |
-| `TimelineSnapshot` | Effective rules and deterministic decisions on `as_of_date`; optional `known_at` filter |
-| `VerifiedExplanation` | Source-backed sentences, rule IDs, source evidence, decision hash, numeric/date guard and optional audio asset ID |
-| `EvaluationScorecard` | Synthetic dataset ID, run ID, actual numerator/denominator metrics, baseline measurements where present |
-
-### Source evidence example
-
-This is a **synthetic fixture**, not a real scholarship notice:
+Catalog item:
 
 ```json
 {
-  "document_id": "doc-corr-01",
-  "document_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-  "extraction_id": "extract-01",
-  "page_number": 1,
-  "literal_quote": "Minimum qualifying marks shall be 70%.",
-  "start_char": 145,
-  "end_char": 183,
-  "boxes": [ { "x0": 0.12, "y0": 0.24, "x1": 0.73, "y1": 0.29 } ]
+  "exam_id": "jee-main",
+  "display_name": "JEE Main",
+  "exam_family": "SCHOOL_ENTRANCE",
+  "audiences": ["SCHOOL"],
+  "organizer": "National Testing Agency",
+  "description": "Engineering entrance examination",
+  "active": true,
+  "source_ids": ["nta-jee-main"]
 }
 ```
 
-The backend must not label such a quote **verified** merely because a model supplied it. It must verify that the quote is present in the extraction with the matching `(document_sha256, extraction_id, page_number)` and that the extracted rule value matches the quote. Character offsets are into the frozen page text for that extraction, not global concatenated text. The sample SHA and coordinates are placeholders and must never be represented as measured evidence.
-
-### Rule candidate example
+Subscription create body:
 
 ```json
 {
-  "rule_id": "rule-marks-v2",
-  "scheme_id": "scholarship-demo-2026",
-  "scope_key": "all_applicants",
-  "effective_from": "2026-10-15",
-  "effective_until": null,
+  "cycle_id": "jee-main:2027:s1",
+  "topics": ["REGISTRATION", "EXAM_SCHEDULE", "ADMIT_CARD"],
+  "application_status": "PLANNING_TO_APPLY"
+}
+```
+
+Notification (synthetic; actual API response must be Pydantic-validated):
+
+```json
+{
+  "notification_id": "notif-demo-1",
+  "user_id": "user-demo-1",
+  "match_id": "match-demo-1",
+  "update_id": "update-demo-1",
+  "cycle_id": "jee-main:2027:s1",
+  "delivery": "DELIVERED",
+  "headline": "JEE Main: application window changed (SYNTHETIC DEMO)",
+  "body": "A source-linked update affects an exam you follow. Open the official notice for details.",
+  "language": "en",
+  "created_at": "2026-10-30T12:00:00Z",
+  "delivered_at": "2026-10-30T12:00:01Z",
+  "read_at": null,
+  "official_source_url": null,
   "evidence": [{
-    "document_id": "doc-corr-01",
+    "document_id": "doc-demo-1",
     "document_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    "extraction_id": "extract-01",
     "page_number": 1,
-    "literal_quote": "Minimum qualifying marks shall be 70%.",
-    "start_char": 145,
-    "end_char": 183,
-    "boxes": []
+    "literal_quote": "Synthetic testing clause only."
   }],
-  "rule_type": "minimum_marks",
-  "min_marks_percent": 70.0
+  "disclaimer": "Decision support only; not official eligibility or application confirmation."
 }
 ```
 
-### Empty-but-valid initial state example
+## 6. Event/review state machine
 
-```json
-{
-  "schema_version": "1.1.0",
-  "workspace_id": "scholarship-demo-2026",
-  "revision": 0,
-  "documents": [],
-  "amendments": [],
-  "active_rules": [],
-  "profiles": [],
-  "decisions": [],
-  "latest_event": null
-}
+```text
+Source listing / admin fixture
+   -> DETECTED -> PROCESSING -> NEEDS_REVIEW
+                        |                |
+                        v                +--(operator rejects)--> REJECTED
+                     FAILED              +--(source mismatch)----> QUARANTINED
+                                         +--(approve)------------> APPROVED
+                                                                    |
+                                         immutable NoticeUpdate + recipient matching
+                                                                    |
+                                           notification QUEUED -> DELIVERED -> READ
+                                                               \-> FAILED (retry)
 ```
 
-This state must render as **no verified decisions**, not as zero affected applicants with verified eligibility.
+Never dispatch from `DETECTED`, `PROCESSING`, `NEEDS_REVIEW`, `QUARANTINED`, or `FAILED`. Approval should be recorded with `reviewer_id`, `reviewed_at`, decision reason, and revision. If an approved update later needs correction, publish a new correction event; do not silently mutate delivered notifications.
 
-### Example apply request
+## 7. Matching logic (deterministic; avoid fanout LLM calls)
 
-```json
-{
-  "expected_workspace_revision": 4,
-  "reviewed_by": "demo_operator",
-  "confirm_source_review": true
-}
-```
+1. Match notice to **one or more explicitly mapped** exam cycles. When uncertain, `NEEDS_REVIEW` instead of mass-broadcast.
+2. Map notice type to topics: deadline/application changes -> `REGISTRATION`; date change -> `EXAM_SCHEDULE`; admit card -> `ADMIT_CARD`; result -> `RESULTS`; etc. A topic `ALL` receives all approved notices for its cycle.
+3. Match active subscriptions. Remove duplicates by `(update_id, user_id)` even if user tracks multiple topics.
+4. For general news, `relevance=GENERAL_UPDATE` and **no** `before`/`after` decisions.
+5. For supported validated rule amendments and profile opt-in, invoke pure Python rule evaluator. Mark actual state changes `PERSONAL_IMPACT`, incomplete profile or coverage `POSSIBLE_IMPACT` / `UNKNOWN`. Never interpret unsupported exemptions as PASS.
+6. Persist recipient matches and notifications with an idempotent outbox transaction. Update real counts only after DB commits; delivery/read status is distinct from *matched*.
 
-Only the backend determines new decisions and emits `ImpactEvent`. The UI is not permitted to send applicant status changes or fabricated counts to the apply endpoint.
+## 8. Data / effective-date / evidence policy
 
-## 4. SourceGate and precedence policy
+- Preserve old v1 rule engine/evidence DTOs from `backend/legacy_schemas_v1.py` while migrating. The new `NoticeChange.proposed_rule` uses the five-rule v1 discriminated union; map `legacy.RuleBase.scheme_id` to `ExamCycle.cycle_id` in application code, document this mapping in tests.
+- `published_on` (source claim) vs `first_seen_at` (fetch timestamp) vs `effective_from` (operative rule date) are distinct. For late publication/effectivity, no unreviewed backdated flip.
+- A supersession requires an explicit reference/target and applicable scope, or review. Newer notice ≠ entire rule set replaced.
+- Actual `EvidenceAnchor.literal_quote` must match a stored immutable extracted page text; fields/offsets are rejected if mismatched. Where OCR position is unreliable, show page and quote only.
+- Source page and URL must be displayed on the user notification and admin details.
+- In-app notification text, Hindi explanatory text, and any audio numbers/dates must be validated against canonical values, otherwise suppress unsupported assertions.
 
-**Before rules are activated**, the backend checks:
+## 9. Frontend views
 
-- Is the intake origin a configured source, or merely a forwarded/unverified file?
-- Does the claimed issuing authority match the expected scheme authority?
-- Does the amendment's reference chain point to the *correct* original document?
-- Are publication and effective dates parsable, explicit, and chronologically coherent?
-- Does the change identify a supported operation and an unambiguous target rule and scope?
-- Does each proposed value appear in its literal source passage, under an immutable extraction ID?
+**User:** exam catalog search/filter (school/engineering/general) -> multi-cycle subscription -> personal notification inbox -> notice detail with original link and summary; optional, opt-in profile page. Show clear `No updates yet`, `Demo data`, `Source unavailable` and `Unknown relevance` states.
 
-Check statuses are `PASS`, `FAIL`, or `UNKNOWN`. Any `FAIL` causes a quarantine recommendation. An unknown provenance condition requires manual review; do **not** auto-approve. A human reviewer is still required when all checks pass.
+**Admin:** live source-health table -> detected/review queue -> approval+quarantine -> recent updates -> per-update recipients and computed before/after counts -> notifications delivered/failed/read; PDF/source evidence inspector, audit, synthetic evaluation scorecard. No misleading "official admin" branding.
 
-**Precedence:** an amendment is not a full replacement of the original document. `REPLACE` or `REVOKE` changes the effective interval of the targeted rule; unrelated rules remain. `ADD` may introduce a new scoped requirement but cannot silently coexist with a contradictory active rule. Document publication time and rule effective time are stored separately. `TimelineSnapshot.as_of_date` selects active rules by *effective* interval; when `known_at` is supplied, the view must also exclude documents not yet acquired by that time. Never assume a later published document is automatically operative.
+**90-second demo:** one genuine source poll (or plainly labeled captured snapshot if network fails), review update, calculate synthetic subscribers, persist alerts, switch to user inbox, show source citation, return to actual admin aggregates. Real personalization only for supported constraints.
 
-## 5. Frontend state and interactions
+## 10. Change control
 
-### States and signals
+`backend/schemas.py` and this markdown are a paired interface contract. When updating fields or enums, update both, add tests, bump schema version when breaking, preserve old code until consumers migrate, and update `PROGRESS.md` with commands/results. No silent magic conversions on API boundaries.
 
-| UI element | Backend-owned value | Rendering rule |
-|---|---|---|
-| Monitor badge | Local watch service health (future dedicated health data) | Show **LOCAL WATCHER** if only folder monitoring exists; never claim national real-time monitoring |
-| Original/corrigendum cards | `SourceDocument` | Show ingestion/extraction state, provenance, acquisition date |
-| Source trust ribbon | `AmendmentRecord.source_gate` | Amber on unverified, red on mismatch/quarantine; do not label proof of forgery |
-| Applicant grid | `ApplicantDecision[]` | Four semantic colors/icons; never infer status from threshold in TypeScript |
-| Shockwave | `ImpactEvent.transitions[]` | Animate affected actual overall state changes, not a hardcoded cohort count |
-| Headline numbers | `ImpactEvent.counts` | Always server-calculated; `PREVIEW` clearly marked provisional |
-| Date slider | `TimelineSnapshot` | Call backend for effective rules + decisions; do not mutate rules client-side |
-| PDF inspector | `SourceEvidence` | Highlight boxes only if validated; otherwise show page + literal quote |
-| Hindi text | `VerifiedExplanation.sentences[]` | Each sentence has rule IDs and evidence anchors |
-| Hindi audio | `VerifiedExplanation.audio_asset_id` | Play only if `numeric_and_date_tokens_checked` is true; display cached/replay label where appropriate |
-| Evaluation drawer | `EvaluationScorecard` | Hide score if no completed real test run; show `correct / total` and synthetic label |
 
-**Color semantics (suggested design tokens):** background `#090F1C`, panel `#101A2B`, text `#F8FAFC`, secondary `#94A3B8`, accent cyan `#38BDF8`, PASS green `#4ADE80`, FAIL red `#F87171`, UNKNOWN slate `#94A3B8`, CONFLICT amber `#FBBF24`. Do not rely on color alone; use icons and labels.
+## 11. Implemented local-slice additions and boundaries
 
-### Shockwave sequencing
+Public schema remains `2.0.0` for this first v2 implementation. V1 remains schema
+`1.1.0` and retains its own `error_code` error shape. V2 errors use `code`.
 
-1. Frontend requests apply with the current revision and reviewed approval.
-2. Server validates gate + evidence, commits rule change/evaluations, returns an **APPLIED** `ImpactEvent`.
-3. Frontend updates the workspace from the server response and animates `transitions`.
-4. Display changed, improved, worsened, and review-required counts from the event, never from a local mock.
-5. Clicking a tile opens its `RuleCheck[]` and each source anchor.
-6. On interruption, refresh state and deduplicate events by `event_id`; animations must not imply a second amendment was applied.
+### Added request/result DTOs
 
-**Event-feed transport:** start with polling every ~2s using the opaque `next_cursor`; retry with exponential backoff; deduplicate by `event_id`. SSE/WebSockets are explicitly optional later.
+- `SubscriptionCreate`: `cycle_id`, unique nonempty `topics` (default ALL),
+  `application_status` (default INTERESTED). `SubscriptionPatch`: optional topics,
+  application status and notifications enabled. ALL is exclusive.
+- `ProfilePatch`: optional language/display name, opt-in and self-reported personal
+  fields. Personal values still require opt-in in the final merged UserProfileV2.
+- `DemoSessionRequest`: persona SCHOOL/ENGINEERING/OPERATOR expressed as lowercase
+  `school`, `engineering`, `operator`. `SessionResponse`: access token, server-owned
+  user ID, display name, USER/ADMIN role, demo_mode=true and aware expiry.
+- `MonitorCheckRequest`: `dry_run=true` default. `MonitorCheckResult`: schema version,
+  source ID, check timestamp, dry-run flag, LIVE/OFFLINE_REPLAY mode, listing SHA-256,
+  discovered/created/duplicate counts, unmapped-item reasons and errors.
+- `SourceHealth`: DISABLED/NEVER_CHECKED/LIVE_OK/ERROR/OFFLINE_REPLAY, attempt/success
+  timestamps, last error/HTTP status, new/total notice counts, robots result and
+  next due time. It reports observations, not cryptographic authenticity.
+- `NoticeDetail`: typed notice, extracted pages, listing URL, observed link title
+  and extraction version. `InboxItem`: notification, actual recipient match,
+  published update and originating notice.
+- `PlatformStatus`: schema version, actual demo mode, Sarvam NOT_CONFIGURED or
+  NOT_TESTED, and disclaimer. This does not certify credentials or API success.
 
-## 6. Voice contracts and failure policies
+Additive fields: EvidenceAnchor has optional `extraction_id` (populated and required
+by this service's publication gate); DetectedNotice has `revision`, `topics`,
+`processing_mode` (SOURCE_EXCERPT/OFFLINE_REPLAY/SARVAM_105B/NEEDS_EXTRACTION),
+`diagnostics` and `requires_rule_validation`. CatalogResponse has server-owned
+`coverage` by exam: CATALOG_ONLY/SOURCE_CONFIGURED/LIVE_MONITORED. Coverage requires
+an enabled tested adapter, successful source health and recent worker heartbeat
+before claiming live monitoring. It is not an open-registration or full-coverage
+claim. NotificationsResponse adds backend-calculated `unread_count`.
 
-- Saaras: capture a short clip with a visible recording indicator and request permission; ensure clip fits the documented REST limit. Show transcription before acting on it.
-- The question is routed to source-backed retrieval/explanation only. Voice input **never** approves/amends rules without an explicit reviewed action.
-- Explanation creation must pin `expected_rule_set_sha256` and reject stale requests (HTTP 409).
-- Sentence references in `VerifiedExplanation` are programmatically resolved against the active decision's rules and source evidence.
-- Numeric/date and entity checking must be performed after text generation and before Bulbul synthesis. If validation fails, replace generated text with a tested deterministic template or decline audio. The `audio_asset_id` field may be present **only** if the guard succeeded.
-- Degraded modes are visible: `LIVE SARVAM`, `CACHED EXTRACTION`, or `OFFLINE REPLAY`. A prior audio file is identified as cached, not newly synthesized.
-- API errors, OCR uncertainty, network timeouts, and malformed dates must never become silent PASS states.
+AdminDashboardTotals adds `notifications_read`. AdminDashboardResponse adds typed
+`source_checks`, database-derived `by_cycle` subscription/update/notification
+counts, `synthetic_demo`, and `monitor_running` based on a recent worker heartbeat.
+The older `source_health` string mapping is retained.
 
-## 7. Evaluation handshake
+### Additional routes
 
-The scorecard reflects **measured** results from a reproducible synthetic test set, not hand-entered dashboard numbers.
+| Method/path | Result / authorization |
+|---|---|
+| GET `/api/v2/status` | PlatformStatus; public |
+| POST `/api/v2/demo/session` | DemoSessionRequest → SessionResponse; loopback-only, explicitly local demo mode |
+| GET `/api/v2/me/notifications/{notification_id}` | InboxItem; owner only, 404 for another user's record |
+| DELETE `/api/v2/me/account` | 204; learner owner, cascades private data and revokes sessions |
+| GET `/api/v2/admin/notices/{notice_id}` | NoticeDetail; operator only |
+| POST `/api/v2/admin/demo/replay` | DetectedNotice[]; operator and demo mode only, explicitly synthetic, never auto-publishes |
 
-- Generate 20+ synthetic original/corrigendum pairs, including English and Hindi/Devanagari, changed and unchanged rules, partial supersession, new document requirements, conflicting clauses, missing facts, authority/reference mismatches, and effective-date edge cases.
-- Preserve gold labels: source text and spans; extracted rule types/values; target-rule mapping; applicable-rule set at a date; profile-level before/after statuses; and expected gate outcomes.
-- Run the NiyamPulse pipeline against those fixtures; separately run a plainly documented baseline (e.g. a single unstructured LLM answer on the same text), with the same inputs and budget limits. Do **not** invent a baseline if one has not run.
-- Store each evaluation run's dataset revision, extraction/model configuration, timestamp, raw predictions, abstentions, numerator/denominator, failure cases, and notes.
-- Send the latest genuine run as `EvaluationScorecard` with `synthetic: true`, `metrics[]` and optional `baseline_metrics[]`.
-- Core measures: rule field exact match, correct amendment target, effective-rule accuracy, applicant decision status accuracy, decision-flip accuracy, and blocked-invalid-source recall. State whether metrics are per-rule, per-pair, or per-applicant; show sample counts.
+The review route requires the body notice ID and reviewer ID to match the URL and
+actual operator session. The server's own clock records approval; client timestamps
+are not authoritative. `(notice_id,expected_revision)` plus canonical request hash
+provides idempotency: exact retries return the stored response, conflicting reuse
+returns 409. No duplicate publication or dispatch occurs.
 
-## 8. Contract change policy and test gates
+### Persistence, evidence and delivery
 
-- Pydantic is authoritative. Do not change API fields in a React component without updating `backend/schemas.py` and this file.
-- Current version `1.1.0` adds the Phase 2 fields/routes above. For breaking changes use a coordinated version bump and regenerate frontend types.
-- Validate models with Pydantic 2, use TypeScript generated from actual OpenAPI, and add backend/frontend contract fixtures.
-- Add negative tests: no evidence; quote mismatch; reversed PDF bounds; reference mismatch; new rule unsupported; ambiguous date; stale revision; unreviewed amendment; forged-looking but *unproven* source; numeric/date mismatch in Hindi TTS; duplicate event replay.
-- Phase 2 API, source-gate, transaction, real-PDF and local-watcher tests have run on native Windows Python 3.12. Frontend behavior, Sarvam endpoints and PDF coordinate highlights remain unimplemented/untested. See `PROGRESS.md` for exact evidence.
+Additive `v2_*` tables share SQLite with the preserved v1 Store. A separate v2
+migration ledger avoids changing the v1 database version. Source captures and
+extractions are immutable. The extraction identity binds raw source SHA-256 and
+extractor version; evidence binds that identity, exact page and offsets. Review
+rechecks source bytes, immutable extraction checksums and source-listing lineage.
+No arbitrary uploaded trust flag is accepted from a subscriber.
+
+Notice dedup is unique by source/canonical URL/meaningful-content hash (cycle,
+observed title, extractor version and frozen page text). Actual raw byte SHA-256
+is stored separately and retained in evidence. This prevents a footer visitor
+counter or PDF metadata-only change from manufacturing a new substantive alert.
+
+A review transaction writes approval, immutable NoticeUpdate, RecipientMatch and
+DELIVERED in-app notification rows together, or rolls all of them back. In-app
+DELIVERED means the owner's persisted inbox row exists; no push/email/SMS delivery
+is implied. Uniqueness `(update_id,user_id)` prevents duplicate alerts. No per-user
+LLM is used. Informational updates have GENERAL_UPDATE with null decisions.
+Notices requiring personal-rule validation are held until the v2 bridge exists.
+
+Inbox cursors are signed and owner-bound; results are newest first. Mark-read is
+idempotent. Subscriptions may be paused or marked NO_LONGER_INTERESTED; those do
+not receive new alerts. APPLIED_SELF_REPORTED is never verified application status.
+
+### Monitoring and deferred work
+
+Only NTA JEE Main and UPSC active exams have implemented, genuinely exercised
+adapters. See `docs/SOURCE_VERIFICATION.md`. Checked-in registry defaults remain
+disabled; runtime enablement follows a successful real check. Exact HTTPS host,
+DNS/public-address and redirect checks precede bounded fetches. Robots is inspected;
+nonstandard UPSC behavior is recorded explicitly. Sources use hourly polling,
+reported failure states and rate-limit cooldowns. The standalone worker and the
+API background worker run independently of the frontend. Run one worker mode at a
+time. Each poll downloads at most five mapped documents; older/unmapped cycles
+are recorded as unmapped, never broadcast to current-year subscribers.
+
+A dry run may record a real fetch/capture/health observation but creates no notices,
+updates or notifications. Failure returns typed 503; an enabled source that is not
+yet due returns 429 with its next scheduled time. Only approved notices publish.
+
+There is no production login provider, free-form Hindi/audio evaluation, v2
+personalized rule-change publication, benchmark scorecard or deep attachment
+crawler. Section 12 supersedes the initial slice with live Sarvam text/OCR and
+controlled Hindi overviews. Existing v1 deterministic tests and
+APIs remain operational. Local demo personas are not a public authentication scheme.
+
+
+## 12. Sarvam text phase (additive v2.0.0 contracts)
+
+`POST /api/v2/admin/notices/{notice_id}/analyze` accepts AnalysisRequest
+`{expected_revision}` and returns NoticeAnalysis. Operator only. It does not approve
+or dispatch. Stale source/revision or existing publication returns 409. Provider
+configuration, quota, transport or credit-budget failures return typed 503 errors.
+`GET /api/v2/admin/sarvam` returns SarvamHealth: observed status, model, local budget
+limit/reservations in integer paise, request/token counts, last success/error.
+PlatformStatus.sarvam_status now also admits LIVE_OK and ERROR.
+
+SarvamCandidate contains exact cycle_id, notice_type, topics, requires_rule_validation
+and 1–6 ExtractedFacts. Each fact has a closed kind (ANNOUNCEMENT,
+APPLICATION_DEADLINE, EXAM_DATE, RULE_CANDIDATE, UNSUPPORTED_REQUIREMENT), 1-based
+page_number, literal_quote and nullable ISO date_value. No decision, recipient,
+source-trust or approval fields are accepted. Quotes, topic support and dates are
+checked against immutable source text in Python. Unsupported/ambiguous rule
+candidates stay held. This DTO is not a committed RuleDefinition.
+
+NoticeAnalysis records analysis_id, notice_id, SARVAM_105B provider/model,
+prompt_version, timestamp, VALIDATED/GUARD_REJECTED, cache_hit, input_sha256,
+extraction_id, pages_processed, total_pages, coverage_complete, nullable candidate,
+English/Hindi summaries, exact evidence and diagnostics. NoticeDetail.analysis is
+nullable. summary_method is EXTRACTIVE_EN_CONTROLLED_HI: English quotes and controlled
+Hindi labels/date statements, not an unchecked generated translation. A partial
+input is explicitly labeled and never presented as full-document processing.
+
+The immutable cache key includes raw-source hash, extraction identity/text hash,
+model, prompt/guard version, cycle/title and actual selected input. No per-user model
+calls. Paid requests reserve integer paise atomically against an explicitly set
+local budget before HTTP. Reservations remain charged locally after errors/timeouts;
+reported amounts are conservative admissions, never fabricated provider bills.
+Requests have fixed model, bounded input/output, no credential logging, no automatic
+retries of uncertain requests, and provider failures do not mutate committed rules,
+reviews or notifications. Cached candidates are revalidated at use/publication.
+Approved localized summaries are frozen in NoticeUpdate; language preference chooses
+only between those reviewed summaries. Original literal evidence remains available.
+
+
+NoticeAnalysis.guard_version records the exact span resolver/validator version.
+Cached provider outputs are reprocessed when this changes, without another paid
+request. A model-folded quote may be resolved only when all non-whitespace characters
+match and there is exactly one contiguous matching span on that page; stored
+literal_quote and offsets are the actual original text, not the folded AI string.
+The current provider schema requests literal ANNOUNCEMENT/RULE_CANDIDATE/
+UNSUPPORTED_REQUIREMENT facts with null date_value; Python date guards remain
+available but no ambiguous numeric date is normalized by the model.
+
+
+### OCR recovery for poor embedded text
+
+POST `/api/v2/admin/notices/{notice_id}/ocr` accepts AnalysisRequest and returns
+OcrResult (notice_id, nullable job_id, PENDING/COMPLETED, cache_hit, page count,
+nullable extraction_id, provider SARVAM_VISION). Operator-only and revision-checked.
+It submits at most five PDF pages within the same explicit Sarvam budget, persists
+the job before polling, and resumes existing jobs instead of resubmitting. Only a
+fully completed output with exactly the original 1-based pages may replace the
+current extraction projection. Raw bytes and earlier extractions remain immutable.
+OCR is not source authentication or human review. No boxes are claimed verified.
+A stale result is cached without overwriting a changed/reviewed notice. Analysis
+from a different extraction is hidden and must be rerun on the corrected text.
+
+
+Scanned/no-text PDFs are retained as NEEDS_EXTRACTION with empty evidence and
+immutable page/source records. They cannot publish or enable a source adapter until
+text is recovered. OCR can verify raw lineage with an empty-text extraction; the
+language-model path refuses empty input without spending credits. The observed
+Document AI server returns type=digitise with 1-based page_num, ordered text blocks
+and HTML tables; this is parsed explicitly alongside the documented per-page
+content shape. A versioned deterministic HTML-to-text extraction is frozen before
+language-model processing. OCR page text is not independently verified against
+pixels and always requires operator comparison with the original PDF.
+
+A GUARD_REJECTED analysis bound to the current extraction blocks publication with
+409 ANALYSIS_GUARD_BLOCKED, including direct API attempts. The operator can quarantine
+or reject; correcting the source/extraction and reprocessing is required to publish.
+
+Controlled Hindi templates additionally recognize a closed set of exact source labels
+(notification date, examination commencement, application receipt deadline, upload
+date), copying the original value/format verbatim. They do not infer an ISO rule,
+calendar interpretation or timezone from ambiguous numeric dates.

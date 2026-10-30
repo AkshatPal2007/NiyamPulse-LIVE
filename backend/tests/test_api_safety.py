@@ -8,7 +8,7 @@ import unittest
 from fastapi.testclient import TestClient
 
 from backend.main import create_app
-from backend.schemas import ApplyAmendmentRequest, GateRecommendation
+from backend.legacy_schemas_v1 import ApplyAmendmentRequest, GateRecommendation
 from backend.services.pdf_intake import extract_pdf, parse_notice
 from backend.services.provenance import source_gate
 from backend.storage import ServiceError

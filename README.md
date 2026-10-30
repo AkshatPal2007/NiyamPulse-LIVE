@@ -1,111 +1,175 @@
-# NiyamPulse LIVE
+# NiyamPulse v2
 
-One scholarship notice changes; deterministic Python shows exactly which synthetic
-applicant decisions changed, with literal source evidence. Decision support only;
-not official approval.
+**Your exams. Your updates. One clear view.**
 
-**Implemented:** Phase 1 engine and Phase 2 local backend. **Next:** Phase 3 frontend.
-No frontend, Sarvam/OCR, Hindi speech or measured evaluation scorecard exists yet.
-Read `AGENTS.md`, `SHARED_CONTRACTS.md`, and `PROGRESS.md` before changing code.
+A local, source-linked exam-notification platform for school students and
+engineering aspirants. The first working flow is:
 
-## Native Windows setup and start
+**Choose exam cycles → subscribe → discover a notice → operator review → matching
+learner inbox → read status and actual admin counts.**
 
-From this project directory in PowerShell, with Python 3.12 installed:
+The earlier scholarship engine/backend is preserved. `/api/v1` stays operational;
+its documentation is in `docs/legacy-v1/`. The new experience uses `/api/v2`.
+Read `AGENTS.md`, `SHARED_CONTRACTS.md` and `PROGRESS.md` before changing code.
+
+## Start on native Windows
+
+From the project root in PowerShell, using the existing Python 3.12 environment.
+Create `.env` from `.env.example` and enter your Sarvam key locally:
 
 ```powershell
-py -3.12 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
-.\.venv\Scripts\python.exe -m backend.demo_setup
-.\.venv\Scripts\python.exe -m uvicorn backend.main:app --host 127.0.0.1 --port 8000
+npm --prefix frontend ci
+npm --prefix frontend run build
+.\.venv\Scripts\python.exe -m uvicorn backend.main:app --env-file .env --host 127.0.0.1 --port 8000
 ```
 
-If your environment already exists, skip its creation. Activation is optional.
-Open [interactive API documentation](http://127.0.0.1:8000/docs). The API base is
-`http://127.0.0.1:8000/api/v1`. This phase is a local operator service; account
-authentication and production deployment are not implemented.
+Open [NiyamPulse](http://127.0.0.1:8000/) or
+[API documentation](http://127.0.0.1:8000/docs). The backend serves the built UI
+and runs the source worker independently of the browser. No Docker/WSL is needed.
+On this machine dependencies and the UI build have already been prepared.
 
-Setup creates the declared synthetic workspace `scholarship-demo-2026`, five
-synthetic profiles, three PDFs in `output/pdf/`, and the watched amendment folder
-`var/intake/`. **It never imports, reviews or applies any notice.** Repeating setup
-preserves state; it does not reset an already reviewed demo. For a fresh isolated
-run, set `$env:NIYAMPULSE_DATA_DIR = 'var/demo-2'` before setup and server startup.
-Use a different data folder rather than deleting an existing database.
-
-## Manual Phase 2 walkthrough
-
-Use **Try it out** in the API documentation, replacing the path parameters:
-
-1. `GET /api/v1/workspaces/{workspace_id}` with workspace ID
-   `scholarship-demo-2026`. Revision starts at 0, with UNKNOWN decisions.
-2. `POST .../documents`: select `output/pdf/synthetic_original.pdf`, set `kind`
-   to `ORIGINAL`, and leave `source_url` absent. HTTP 202 means queued, not verified.
-   Copy the returned `document.document_id`.
-3. Poll the workspace. Inspect the original's `source_gate.checks`, the stored PDF
-   at `.../documents/{document_id}/pdf#page=1`, and its `/extraction` endpoint.
-   Page numbers are 1-based; literal offsets refer to immutable page text.
-4. Explicitly review the original using `POST .../documents/{document_id}/review`:
-
-   ```json
-   {
-     "expected_workspace_revision": 0,
-     "reviewed_by": "your_operator_name",
-     "confirm_source_review": true
-   }
-   ```
-
-   This bootstraps the verified baseline at revision 1. The name is a local
-   operator assertion, not an authenticated identity.
-5. Copy `output/pdf/synthetic_corrigendum.pdf` into `var/intake/`. The running
-   watcher will detect the new bytes, record SHA-256 and acquisition metadata,
-   extract them and prepare an amendment. It **never applies automatically**.
-   Alternatively, upload it through `/documents` with `kind=CORRIGENDUM`.
-6. Read the workspace's `amendment_id`, then call
-   `GET .../amendments/{amendment_id}/preview`. Inspect source checks, targets and
-   actual before/after decisions. Expect 5 evaluated, 2 changed: 1 improved and
-   1 review-required; 3 unchanged. These are synthetic fixture outcomes.
-7. After reviewing the source, explicitly call `POST .../amendments/{amendment_id}/apply`
-   with revision **1**, your name and `confirm_source_review: true`. The transaction
-   returns revision **2** and one persisted APPLIED event.
-8. Read `/events`, then use its opaque `next_cursor` to poll without replaying old
-   events. Try `/timeline?as_of_date=2026-10-14` and `2026-10-15` to inspect the
-   effective-date boundary. An optional aware `known_at` selects committed knowledge.
-9. Upload `output/pdf/synthetic_mismatch.pdf` as a corrigendum. Its authority check
-   fails, so it is quarantined and cannot change rules, decisions or events.
-
-The watcher folder accepts **corrigenda only**. Originals use the explicit upload
-and original-review flow. Only locally configured acquisition channels or configured
-file hashes can pass the origin check. A user-supplied URL never establishes trust.
-Configured-source matching is not proof of cryptographic authenticity.
-
-## Supported parsing and truthful degraded behavior
-
-Phase 2 supports a strict `NIYAMPULSE [SYNTHETIC] NOTICE v1` PDF text format. See
-`backend/demo_fixtures.py` for literal headers and closed rule syntax. RULE belongs
-to originals; ADD, REPLACE with a target/new ID, and REVOKE belong to corrigenda.
-English and Hindi clause grammars are shared with Phase 1; actual Phase 2 PDF
-integration tests currently cover English only. Arbitrary administrative prose,
-unsupported conditions, scans needing OCR and malformed dates are held for review
-or fail visibly. No rule subset from a failed document can be activated.
-
-PDFs are limited to 10 MiB / 20 pages. Source bytes, extraction snapshots,
-acquisition records, committed snapshots and events have append-only SQLite guards.
-Extraction caches use PDF hash and extractor version, not filenames. Cached work is
-labeled `CACHED_EXTRACTION`; new local work is `LOCAL_PDF`. No live Sarvam call is
-claimed. PDF boxes are deliberately empty; the API supplies page + exact quote
-without asserting verified coordinate highlighting.
-
-## Tests
+For frontend development, keep the API running and use a second PowerShell:
 
 ```powershell
-.\.venv\Scripts\python.exe -m unittest discover -s backend/tests -v
-.\.venv\Scripts\python.exe -m backend.schemas
-.\.venv\Scripts\python.exe -m backend.synthetic_demo
+npm --prefix frontend run dev
 ```
 
-Tests use isolated databases and synthetic inputs. They cover engine boundaries,
-real PDF extraction, source/value checks, unreviewed/invalid inputs, rollback,
-concurrent apply, history, cached extraction, restart recovery and the actual
-Windows watcher. See `PROGRESS.md` for observed versions, counts and limitations.
-`/evaluations/latest` returns a typed 404 until a genuine evaluation run exists.
+Open [Vite development UI](http://127.0.0.1:5173/). It proxies `/api` to port 8000.
 
-`MODEL_HANDOFF.md` contains a copyable prompt for another model.
+## Local demo identity and privacy
+
+The top-right persona picker switches among **synthetic** school learner,
+engineering learner and platform operator accounts. These are real local database
+records with expiring opaque sessions and role/ownership checks. They are not a
+production login system. Keep this prototype bound to loopback.
+
+Subscriptions require no DOB, marks or income. Optional profile data needs explicit
+opt-in. Personalization removal and account deletion are implemented. Removing a
+learner revokes their sessions and deletes their subscriptions/inbox; restarting
+will not silently recreate that deleted account.
+
+`APPLIED_SELF_REPORTED` is a learner assertion, never official application status.
+Every result view includes: **Decision support only; not official eligibility or
+application confirmation.**
+
+## A short end-to-end walkthrough
+
+1. Select **School learner**, open **Explore exams**, follow JEE Main 2027
+   Session 1. Choose topics if needed. More than one exam/cycle may be followed.
+2. Select **Engineering learner**, follow GATE 2027. GATE is catalog-only until
+   its own adapter is independently verified; this does not imply live coverage.
+3. Select **Platform operator** and click **Replay synthetic notices**. This
+   creates two explicitly labeled test notices, not a fake official fetch.
+4. Inspect the synthetic JEE notice. Read its evidence, enter a review reason,
+   confirm the exact cycle, then **Approve & notify matching subscribers**.
+5. Switch to the school learner: the JEE alert appears. Open it to persist READ.
+   The GATE-only engineering learner receives no JEE alert.
+6. Return to the operator dashboard. Delivery/read/chart values come from actual
+   database records. The source queue also contains genuine notices if monitored.
+
+The automated browser QA already exercised this path in the local database: two
+subscriptions, one synthetic JEE publication, one delivered/read alert. Genuine
+NTA/UPSC notices remain pending human review. Replaying is idempotent and does not
+reset or manufacture fresh notices on each click.
+
+## Real official-source monitoring
+
+NTA JEE Main and UPSC active examinations have each completed a real native fetch,
+parse and extraction run. See `docs/SOURCE_VERIFICATION.md` for URLs, timestamps,
+raw hashes, robots behavior and coverage boundaries. These two sources are enabled
+in this machine's local runtime database; new checkouts start with all disabled.
+
+To verify and enable those adapters on a fresh local data directory:
+
+```powershell
+.\.venv\Scripts\python.exe -m backend.monitor --check nta-jee-main --discover --enable
+.\.venv\Scripts\python.exe -m backend.monitor --check upsc-active --discover --enable
+```
+
+Enablement requires an actual mapped discovery with no processing errors. An
+already enabled source that is not due returns a cooldown rather than polling
+again immediately. Default interval is 60 minutes. Captured older/ambiguous exam
+cycles are not routed to current subscribers. Only reviewed notices publish.
+
+The API normally runs the worker. To run it separately while the API is closed:
+
+```powershell
+.\.venv\Scripts\python.exe -m backend.monitor
+```
+
+Run one worker mode at a time. If using the standalone process alongside the API,
+set `$env:NIYAMPULSE_WEB_MONITOR = '0'` before launching the API. Set
+`NIYAMPULSE_DATA_DIR` consistently for both processes to select another local
+SQLite directory. Closing the frontend does not stop the worker.
+
+The source registry is an initial catalog, not a coverage guarantee. NTA covers
+its configured listing and linked PDFs; UPSC covers active-exam detail pages.
+Deep attachment changes, archive pagination and additional publishers are future
+work. Downloads are bounded, exact-host allowlisted and redirect/DNS checked.
+Source matching is not cryptographic authenticity or publisher endorsement.
+
+## What is and is not implemented
+
+- **Implemented:** preserved five-rule evaluator; v2 catalog, owned subscriptions,
+  optional profile/erasure, private inbox/read state, operator review, deterministic
+  cycle/topic fan-out, transactional in-app delivery, immutable evidence, two live
+  source adapters, independent scheduling and responsive learner/operator UI.
+- **Held:** v2 personalized rule-amendment publication. Until the reviewed evidence
+  bridge exists, rule-like notices requiring it cannot be approved as a shortcut.
+- **Implemented Sarvam phase:** bounded cached 105B extraction and Vision OCR,
+  exact source guards, controlled Hindi overviews and reviewed language fan-out.
+  Genuine UPSC analysis validated; genuine NTA OCR completed but its fact
+  proposals remain held by evidence guards.
+- **Not implemented:** free-form Hindi/audio evaluation, public authentication,
+  all-exam monitoring, personalized v2 rule publication and measured evaluation.
+  No LLM decisions or per-subscriber LLM calls are made.
+
+## Tests and generated frontend types
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest -q
+.\.venv\Scripts\python.exe -m backend.schemas
+.\.venv\Scripts\python.exe -m pip check
+.\.venv\Scripts\python.exe -m scripts.export_openapi
+npm --prefix frontend run types
+npm --prefix frontend run build
+```
+
+Tests include the 61 preserved v1 cases, the supplied contract tests, captured
+source fixtures, HTTP failures/SSRF/redirects, dedup, topic/ownership gates,
+privacy deletion, rollback, idempotency and signed inbox pagination. No test calls
+Sarvam or performs real official application actions. Genuine network verification
+is recorded separately from mocked/captured adapter tests.
+
+See `PROGRESS.md`, `docs/MIGRATION_AUDIT.md` and `MODEL_HANDOFF.md` for current state.
+
+
+## Sarvam configuration and the real-notice review gate
+
+The local key is in ignored `.env`; never paste it into chat or frontend settings.
+The user authorized a ₹50 testing cap. This cap persists in SQLite and is not reset
+by a restart. `python -m backend.analyze` reports genuine request/token records and
+local reservations; these are not a provider bill. Current reservation is ₹35.
+
+Explicit local operator commands (not an automatic publication loop):
+
+```powershell
+.\.venv\Scripts\python.exe -m backend.analyze
+.\.venv\Scripts\python.exe -m backend.analyze --notice STORED_NOTICE_ID
+.\.venv\Scripts\python.exe -m backend.analyze --notice STORED_NOTICE_ID --ocr
+```
+
+The admin review modal also offers these actions. Repeated unchanged extraction
+uses the immutable cache; OCR resumes/reuses a stored job. Every paid admission
+reserves ₹5 and is blocked if it would exceed the configured cap. OCR is limited to
+five stored PDF pages in this slice. A rejected candidate cannot publish.
+
+The synthetic **Engineering learner** is already following **UPSC ESE 2027** with
+Hindi preference for this walkthrough. As operator, open the real UPSC
+notice and original source, compare the source/cycle/evidence, enter your own
+review reason and approve only after checking it. Switch back to the subscriber
+and inspect the actual inbox alert. This notice contains historical source dates;
+its discovery does not mean applications are currently open. NTA remains held.
+
+See `docs/SARVAM_VERIFICATION.md` for verified outcomes and limitations.

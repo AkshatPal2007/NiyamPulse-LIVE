@@ -1,0 +1,77 @@
+{
+  "schema_version": "2.0.0",
+  "description": "Initial source candidates from the migration kit. Only NTA JEE Main and UPSC active adapters have completed independent native checks; checked-in defaults remain disabled.",
+  "sources": [
+    {
+      "source_id": "nta-jee-main",
+      "organization": "National Testing Agency",
+      "source_kind": "OFFICIAL_WEB_LISTING",
+      "listing_url": "https://jeemain.nta.nic.in/public-notices/",
+      "allowed_hosts": [
+        "jeemain.nta.nic.in",
+        "cdnbbsr.s3waas.gov.in"
+      ],
+      "readiness": "LISTING_VERIFIED_ADAPTER_UNTESTED",
+      "adapter_name": null,
+      "enabled": false,
+      "poll_interval_minutes": 60,
+      "notes": "Official listing and its actually observed S3WaaS PDF host; adapter is verified separately at runtime. Never infer authenticity from host alone."
+    },
+    {
+      "source_id": "nta-neet-ug",
+      "organization": "National Testing Agency",
+      "source_kind": "OFFICIAL_WEB_LISTING",
+      "listing_url": "https://neet.nta.nic.in/public-notices/",
+      "allowed_hosts": [
+        "neet.nta.nic.in"
+      ],
+      "readiness": "LISTING_VERIFIED_ADAPTER_UNTESTED",
+      "adapter_name": null,
+      "enabled": false,
+      "poll_interval_minutes": 60,
+      "notes": "NEET UG notices; validate year and notice type, do not infer eligibility from notice title"
+    },
+    {
+      "source_id": "upsc-active",
+      "organization": "Union Public Service Commission",
+      "source_kind": "OFFICIAL_WEB_LISTING",
+      "listing_url": "https://www.upsc.gov.in/examinations/active-exams",
+      "allowed_hosts": [
+        "www.upsc.gov.in"
+      ],
+      "readiness": "LISTING_VERIFIED_ADAPTER_UNTESTED",
+      "adapter_name": null,
+      "enabled": false,
+      "poll_interval_minutes": 60,
+      "notes": "Shared NDA and ESE listings; separate by exam and cycle; confirm redirects/canonical pages"
+    },
+    {
+      "source_id": "ssc-board",
+      "organization": "Staff Selection Commission",
+      "source_kind": "OFFICIAL_WEB_LISTING",
+      "listing_url": "https://ssc.gov.in/",
+      "allowed_hosts": [
+        "ssc.gov.in"
+      ],
+      "readiness": "LISTING_VERIFIED_ADAPTER_UNTESTED",
+      "adapter_name": null,
+      "enabled": false,
+      "poll_interval_minutes": 60,
+      "notes": "Shared JE/CGL/CHSL board; may require rendering or network inspection; no bypass of protection"
+    },
+    {
+      "source_id": "gate-2027",
+      "organization": "Year-specific GATE organizer (unverified candidate)",
+      "source_kind": "OFFICIAL_WEB_LISTING",
+      "listing_url": "https://gate2027.iitm.ac.in/notifications",
+      "allowed_hosts": [
+        "gate2027.iitm.ac.in"
+      ],
+      "readiness": "DISABLED",
+      "adapter_name": null,
+      "enabled": false,
+      "poll_interval_minutes": 60,
+      "notes": "Kit-supplied candidate URL did not verify successfully in this run. Keep disabled; verify publisher and year independently before implementing an adapter."
+    }
+  ]
+}

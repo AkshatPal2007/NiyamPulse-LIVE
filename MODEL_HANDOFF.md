@@ -1,112 +1,84 @@
-# Copyable model handoff prompt
+# Current model handoff — NiyamPulse v2
 
-You are helping build **NiyamPulse LIVE** in
-`C:\Users\Akshat\Desktop\Hackathon\ShipHappen` on native Windows / PowerShell /
-Python 3.12. Read `AGENTS.md`, `SHARED_CONTRACTS.md`, `PROGRESS.md`, and `README.md`
-before changing code. Inspect the implementation and run tests; distinguish
-verified, assumed and untested behavior. Never describe planned features as working.
+Work in the existing native Windows Python 3.12 repository. Read `AGENTS.md`,
+`SHARED_CONTRACTS.md`, `PROGRESS.md`, `README.md` and `docs/MIGRATION_AUDIT.md` first.
+The product direction has changed: it is now a multi-exam subscription and
+source-monitored in-app notification platform. Do not return to upload-first
+scholarship development as the main experience.
 
-## Product and invariants
+The earlier backend is preserved, including the five-rule deterministic evaluator,
+PDF extraction/evidence handling and 61 tests. The original schema 1.1.0 is in
+`backend/legacy_schemas_v1.py`; v1 services import it explicitly. V2 schemas compose
+with it and preserve `/api/v1`. V2 tables are additive; `backend/storage.py` remains
+an existing module, not a directory to overwrite. V1 docs are archived.
 
-The product watches a configured local folder for Indian scholarship corrigenda,
-extracts source-backed candidate rules, checks provenance/evidence, requires human
-review, deterministically recalculates synthetic applicant decisions, and will
-display actual decision changes as a visual impact wave. The demo message is:
-"One notice changed; here is exactly who was affected."
+The first v2 informational slice is implemented: public multi-exam catalog; opaque
+local demo sessions; user-owned cycle/topic subscriptions; optional opt-in profile
+and erasure; private paginated inbox/read state; operator-only evidence review;
+revision/idempotency checks; deterministic matching; atomic in-app notification
+fan-out; database-derived admin totals/charts. V2 DTO/API version is 2.0.0. Update
+schemas and SHARED_CONTRACTS together for public changes.
 
-Exactly five rule types: `minimum_marks`, `maximum_income_inr`,
-`application_deadline`, `age_bounds`, `required_documents`. Exactly four decision
-statuses: `PASS`, `FAIL`, `UNKNOWN`, `CONFLICT`. An LLM may propose candidates and
-express verified facts; it must never determine decisions. Aggregate precedence
-is CONFLICT > FAIL > UNKNOWN > PASS; no verified applicable rules means UNKNOWN.
-Only overall FAIL to PASS is IMPROVED; only PASS to FAIL is WORSENED. Equal overall
-status is UNCHANGED, even if individual checks change.
+Actual NTA JEE Main and UPSC adapters were fetched and exercised on native Windows.
+Each discovered/extracted one mapped 2027 notice; older UPSC items stayed unmapped.
+They are enabled locally on hourly polling; config defaults remain disabled for a
+fresh setup. The worker is independent of the browser and can run as a standalone
+process. See `docs/SOURCE_VERIFICATION.md` for exact hashes, timestamps and robots/
+site-policy observations. Do not claim cryptographic authenticity or all-exam
+coverage. No protection bypass, application automation or paid service was used.
 
-Preserve the visible disclaimer: **Decision support only; not official approval.**
-Configured-source matching is not cryptographic authenticity. Evidence presence
-alone is not verification. Demo applicants/notices are synthetic. Never invent
-metrics, live monitoring, API success, highlights, OCR or audio.
+Frontend is React/TypeScript/Vite/Tailwind with types generated from actual OpenAPI.
+It has separate responsive student and operator views. A real browser walkthrough
+verified JEE/GATE subscriptions, synthetic JEE review, correct exclusion of the
+GATE-only learner, delivery, evidence and READ. Original live notices stayed pending.
 
-## Completed and verified
+All demo identities are synthetic and prominently labeled. Local demo role
+selection is not production authentication. No DOB/marks/income is required to
+subscribe. The disclaimer is: Decision support only; not official eligibility or
+application confirmation. GENERAL_UPDATE never contains invented eligibility
+before/after states. The existing Python engine is still authoritative.
 
-**Phase 0:** `.venv` exists; native Windows Python 3.12.10 / Pydantic 2.14.2 verified.
-Git exists. Check Git status before editing. Dependencies are in `requirements.txt`
-and `requirements-dev.txt`. Local commits are made; do not infer they were pushed.
+DONE IN SARVAM PHASE: live authenticated 105B requests, Vision OCR on all three
+NTA PDF pages, bounded cached candidates, exact-quote guards, deterministic Hindi
+labels/value copies and reviewed language fan-out. The actual UPSC candidate
+validated; NTA candidate proposals remain rejected/held. No genuine source notice
+was approved or dispatched. ₹50 cap authorized; ₹35 reserved across 7 admitted
+operations (not actual billing). See docs/SARVAM_VERIFICATION.md.
 
-**Phase 1:** pure evaluators, reason codes, inclusive condition boundaries,
-start-inclusive/end-exclusive effective intervals, scope matching, conflicts,
-targeted ADD/REPLACE/REVOKE planning, content-bound verification inputs,
-deterministic hashes, actual impact counts and PREVIEW events. Three English/Hindi
-text fixture pairs cover 13 synthetic profiles with independent gold labels.
-Core modules: `backend/services/rule_engine.py`, `amendments.py`, `impact.py`.
+NOT DONE: free-form Hindi/audio evaluation, production
+login/consent, v2 validated personal-rule publication, deep attachment crawling,
+more adapters, broad archive coverage and measured evaluation. Current notice
+summaries are source excerpts. Rule-like notices requiring the v2 bridge are held,
+not published through an informational workaround. No per-subscriber LLM calls.
 
-**Phase 2:** `backend/main.py` is a working local FastAPI backend. SQLite stores
-immutable PDF bytes, extraction snapshots, acquisitions, committed snapshots and
-events. Actual PyMuPDF extraction feeds a strict declared notice-template parser.
-Source gates check configured acquisition, scheme/authority, original reference,
-chronology, exact evidence identity and value/date/scope agreement. Unsupported or
-unverified documents cannot change committed decisions. There is explicit
-original review, amendment preview and human-confirmed application. Apply uses
-one revision-checked transaction for review, rules, decisions, snapshot and event.
-Concurrent applies have one winner; forced event-write failure rolls back the
-whole operation. Multi-query workspace reads use one consistent snapshot.
-
-Implemented `/api/v1` routes: health, workspace, PDF import, original review,
-stored PDF/extraction access, amendment preview/apply, effective/known-at timeline,
-and signed cursor event polling. Evaluation returns typed 404 until a real run
-exists. Errors use `ApiError`; implemented JSON result routes use response models.
-
-The Watchdog service actually detects stable new PDFs in a configured local
-**corrigendum** directory, records hashes, suppresses duplicates and never applies
-automatically. Health is observed. Extraction caches are labeled and keyed by PDF
-hash plus extractor version. A supplied URL cannot establish trust. Duplicate
-content preserves its first acquisition.
-
-Public DTO/API version is **1.1.0**. `backend/schemas.py` is authoritative; update
-it and `SHARED_CONTRACTS.md` together for public changes. Phase 1 engine version
-remains 1.0.0. Internal rule/change trust hashes must never become client-controlled
-HTTP flags. See `backend/services/README.md` for engine conventions.
-
-**Verification:** 61 tests pass on Windows Python 3.12; schema smoke and pip check
-pass. A real Uvicorn HTTP smoke verified health, workspace, actual local watcher,
-docs and OpenAPI. Three synthetic PDFs were rendered with Poppler and visually
-inspected. Full PDF/API fixture impact: 5 evaluated, 2 changed (1 improved,
-1 review-required), 3 unchanged. These are test outcomes, not accuracy scores.
-Starlette emits a non-failing httpx TestClient deprecation warning.
-
-## Run locally
+Run:
 
 ```powershell
-.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
-.\.venv\Scripts\python.exe -m unittest discover -s backend/tests -v
-.\.venv\Scripts\python.exe -m backend.schemas
-.\.venv\Scripts\python.exe -m backend.demo_setup
-.\.venv\Scripts\python.exe -m uvicorn backend.main:app --host 127.0.0.1 --port 8000
+.\.venv\Scripts\python.exe -m pytest -q
+.\.venv\Scripts\python.exe -m scripts.export_openapi
+npm --prefix frontend run types
+npm --prefix frontend run build
+.\.venv\Scripts\python.exe -m uvicorn backend.main:app --env-file .env --host 127.0.0.1 --port 8000
 ```
 
-Swagger: `http://127.0.0.1:8000/docs`. Workspace: `scholarship-demo-2026`.
-PDFs: `output/pdf/`. Watched folder: `var/intake/`. Setup creates configuration
-and profiles only; it does not import, review or apply. See README for manual
-review steps. Setup does not reset a used demo; choose another
-`NIYAMPULSE_DATA_DIR` for isolation.
+The backend serves the built frontend at `/`. Development UI: `npm --prefix frontend
+run dev`, port 5173, with an API proxy. Standalone source worker: `python -m backend.monitor`.
+Do not run two worker modes together. Credentials stay in local environment variables;
+never put them in chat, source files or frontend bundles.
 
-## Remaining work and limits
+Check current Git status and progress for exact latest test totals. Preserve working
+code and user changes. Do not push, deploy publicly or use paid credentials without
+authorization. Continue the next smallest authorized increment, not a restart.
 
-Next is the React + TypeScript + Vite + Tailwind frontend: command center,
-source-review flow, four-status applicant grid, backend-event-driven impact wave,
-timeline, quarantine presentation and page/quote evidence inspector. Generate
-types from actual OpenAPI. Poll events and deduplicate IDs. Never infer decisions
-or impact counts in TypeScript or animate a fabricated cohort.
 
-There is no frontend yet. Sarvam Vision/105B/Saaras/Bulbul, guarded Hindi speech,
-general free-form notice extraction, production authentication, exact PDF
-coordinate highlighting, a 20+ pair benchmark/baseline and full product offline
-replay remain unimplemented. Phase 2 PDF integration tests cover English;
-Phase 1 text fixtures also cover Hindi. Scans visibly require OCR/review. Boxes
-are empty: show page + literal quote until coordinates are verified. Do not add
-LangGraph, Redis, Docker or other infrastructure without a demonstrated need.
+Current manual gate: user must inspect and approve/reject the real UPSC notice as
+required by AGENTS invariant 3. Keep the NTA guard hold. User's pre-existing port
+8000 server was not stopped; it must be restarted to load new backend code. Only
+stop agent-owned port 8001 verification server. Do not reset the user's additional
+synthetic reviews/subscriptions. Continue remaining phases after human review;
+do not imply the entire project or the v2 rule bridge is complete.
 
-Proceed only with the phase/task the user authorizes. Work autonomously within
-scope, pause for required input, add meaningful failing regression tests before
-fixing correctness behavior, update `PROGRESS.md` with exact commands/results,
-and keep credentials and generated databases out of Git.
+Latest native result: 101 tests + 38 subtests passed; production UI build, schema
+smoke, pip check passed. Engineering learner is prepared with an actual ESE 2027
+subscription and Hindi preference; user only needs real source review/approval
+before opening that learner inbox. This setup added no personal applicant data.

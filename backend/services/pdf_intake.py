@@ -13,7 +13,7 @@ from threading import RLock
 import pymupdf
 from pydantic import TypeAdapter
 
-from backend.schemas import (
+from backend.legacy_schemas_v1 import (
     AmendmentChange, DocumentExtraction, DocumentKind, ExtractedPage,
     RuleDefinition, SourceEvidence,
 )

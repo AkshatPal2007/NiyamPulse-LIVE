@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 import uuid
 
-from backend.schemas import (
+from backend.legacy_schemas_v1 import (
     AmendmentChange, AmendmentRecord, ApplyAmendmentResponse, DocumentKind, ExtractionState,
     GateCheck, GateCheckStatus, GateRecommendation, ImpactEvent, ImportDocumentResponse,
     IntakeState, PreviewAmendmentResponse, ReviewState, SourceDocument, SourceMatchState,
@@ -199,7 +199,7 @@ class WorkspaceService:
         return revision
 
     def review_original(self, workspace_id, document_id, request):
-        from backend.schemas import ReviewOriginalRequest
+        from backend.legacy_schemas_v1 import ReviewOriginalRequest
         request = ReviewOriginalRequest.model_validate(request.model_dump(mode="json"))
         with self.store.connect(write=True) as con:
             row = self.store.row(con, workspace_id)
@@ -223,7 +223,7 @@ class WorkspaceService:
         return self.store.state(workspace_id)
 
     def apply(self, workspace_id, amendment_id, request):
-        from backend.schemas import ApplyAmendmentRequest
+        from backend.legacy_schemas_v1 import ApplyAmendmentRequest
         request = ApplyAmendmentRequest.model_validate(request.model_dump(mode="json"))
         with self.store.connect(write=True) as con:
             row = self.store.row(con, workspace_id)

@@ -1,7 +1,7 @@
 from datetime import date
 import unittest
 
-from backend.schemas import AmendmentChange, DecisionStatus as S
+from backend.legacy_schemas_v1 import AmendmentChange, DecisionStatus as S
 from backend.services.amendments import change_fingerprint, plan_amendment
 from backend.services.rule_engine import EngineError, evaluate_applicant, rule_fingerprint
 from backend.tests.support import evidence, make_rule, profile, verified

@@ -1,6 +1,6 @@
 > Current status: see [FINAL_DEVELOPMENT_REPORT.md](FINAL_DEVELOPMENT_REPORT.md) and [PROGRESS.md](../PROGRESS.md). The phase descriptions below define scope; their original future-tense wording does not override the current status list. No hosted deployment was performed.
 
-# Future implementation plan — NiyamPulse v2
+# Future implementation plan — NiyamPulse
 
 Updated after implementation and native verification on 31 October 2026.
 The original audit is historical; current evidence is in
@@ -30,7 +30,7 @@ receive source-linked English/Hindi in-app alerts. Optional personal impact uses
 only the verified closed-set Python engine and opted-in data. It never constitutes
 official eligibility or application confirmation.
 
-Keep the existing repository, v1 evaluator, evidence and useful UI. No restart,
+Keep the existing repository, deterministic evaluator, evidence and useful UI. No restart,
 nationwide-coverage claim, new paid provider, public deployment or removal of old
 working code is part of this plan without the relevant authorization.
 

@@ -103,3 +103,31 @@ cards with literal source excerpts collapsed by default. Preserved all voice/pro
 choices, real-data fetching, official links and unmodified literal evidence.
 No backend/schema/role/data/budget changes. Frontend TypeScript/Vite build passes;
 owner selected “I’ll check it myself” for authenticated visual acceptance. The local preview is open; no private UI screenshot or desktop/mobile browser pass is claimed for this increment. Existing backend was left running; no deployment or Git push performed.
+
+## DONE / PARTIAL — release audit and safe cleanup, 31 October 2026
+
+Fresh native regression: **219 passed + 38 subtests**, 67.58 s, one existing
+TestClient deprecation warning. Current TypeScript/Vite build, pip dependency
+check and all seven recorded source hashes pass. Local preflight READY, including
+DB integrity, verified administrator and no synthetic runtime identities/notices.
+This is local evidence, not hosted acceptance.
+
+Removed the disposable tmp/ci-clean-repro checkout/archive and two old isolated
+test directories: 210 files / 3,564,545 bytes. Removed project Python/test caches,
+generated temporary OpenAPI JSON and TypeScript build metadata afterward: another
+74 files / 1,483,355 bytes, for **284 files / 5,047,900 bytes total**. Every
+recursive target was resolved/checked inside this workspace, checked for tracked
+files and reparse points before native PowerShell deletion. Preserved .env, venv,
+node_modules, the frontend dist required by the app, all var databases/WALs/source
+evidence/backups/ledger, useful screenshots and submission documentation. Caches
+can regenerate during normal use. No paid API call, deployed change or Git push.
+
+Corrected unsupported certainty/authenticity wording and stale hardcoded database
+counts in the new submission document without deleting it. Core local demo/MVP
+is ready within its declared scope. Render administrator promotion/persistent
+storage and hosted email/learner/restart checks still need confirmation; owner
+chose manual visual acceptance for the latest workspace UI. Broader source
+coverage, independent broad evaluation and operational/privacy review remain
+future release scope. No unconditional production-complete claim.
+
+Concurrent README/FUTURE_PLAN documentation edits were observed during this audit. Their content was preserved; only README trailing whitespace was normalized. The README currently repeats unsupported numerical/certainty wording; reconcile it with the corrected submission notes before submission.

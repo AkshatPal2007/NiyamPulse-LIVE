@@ -1,1 +1,4 @@
 *.pdf binary
+# Captures are evidence: preserve exact downloaded bytes and SHA-256 on every OS.
+tests/fixtures/official/** -text -whitespace
+tests/fixtures/official/capture_manifest.json text eol=lf

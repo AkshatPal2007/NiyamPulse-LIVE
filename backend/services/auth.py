@@ -125,6 +125,7 @@ class AuthService:
     def config(self):
         return s.AuthConfig(registration_available=self.mailer.configured,
                             email_delivery_configured=self.mailer.configured,
+                            support_email=os.environ.get('PUBLIC_SUPPORT_EMAIL') or None,
                             deployment_mode='production' if self.settings.production else 'local')
 
     def check_origin(self, origin):

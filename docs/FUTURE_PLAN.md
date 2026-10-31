@@ -1,11 +1,4 @@
-> Current release priority (31 October): real SMTP/admin activation is complete.
-> Native deployment checks, backups/recovery, health endpoints and release files
-> are implemented. Follow [DEPLOYMENT.md](DEPLOYMENT.md) and ../PROGRESS.md for
-> platform selection, Linux CI, private restore and hosted acceptance. A fully free
-> cloud backend needs an external DB/storage/mail/scheduler migration; current
-> SQLite/worker/SMTP is unsuitable for Render Free or Vercel Functions.
-> Preserve the 500-credit guard and exhausted ₹50 cap. Optional voice, broader
-> source coverage, consent and measured capacity remain later work.
+> Current status: see [FINAL_DEVELOPMENT_REPORT.md](FINAL_DEVELOPMENT_REPORT.md) and [PROGRESS.md](../PROGRESS.md). The phase descriptions below define scope; their original future-tense wording does not override the current status list. No hosted deployment was performed.
 
 # Future implementation plan — NiyamPulse v2
 
@@ -17,8 +10,13 @@ The original audit is historical; current evidence is in
 - Phase 2: **complete**; user-reviewed genuine UPSC alert persisted and read.
 - Phase 3: **implemented/tested within declared bounds**; three real adapters,
   rotating intake, observed attachments, durable queue and credit protection.
-- Next: phase 4. Retain conservative holds and the 500-credit reserve. Current
-  ₹50 local reservation cap is exhausted, so further paid calls stay paused.
+- Phase 4: implemented: optional adult-own profile inputs, per-rule checks and honest four-state rendering.
+- Phase 5: real accounts and native deployment preparation implemented; hosted acceptance remains manual.
+- Phase 6: PARTIAL. Persisted three-case/13-profile synthetic text benchmark and replay agreement work. Independent gold review, broader OCR/classification/matching measurements and comparative baselines are still required.
+- Phase 7: bounded Saaras v4 / Bulbul v4 Flash integrated and live-tested with reviewed public notice text/generated audio. Real microphone/device and pronunciation acceptance remain manual.
+- Release UI: editorial redesign implemented; desktop/phone browser checks and owner confirmation of settings/evaluation succeeded.
+- Spending: INR cap removed by the owner; preserve the 500-credit floor, every ledger row and 15-minute manual balance expiry. Last supplied balance 596.96; two speech checks consumed conservative reservations, not a verified billing amount.
+- CI: owner reports both jobs green before this increment. Push/rerun the new changes; no new remote run was performed by the agent.
 
 The detailed phase requirements below remain the implementation/acceptance
 reference; completed items are documented in the phase report.
@@ -127,8 +125,7 @@ correct complete/missing/conflicting outcomes and no inferred official approval.
 
 **Implement:** production identity/session handling and account ownership,
 operator-role provisioning, secure configuration, backup/restore, migration
-verification, audit logging and appropriate privacy/consent controls. Demo role
-selection remains explicitly local and separate. Verify migration 004 against a
+verification, audit logging and appropriate privacy/consent controls. Synthetic fixture identities are restricted to isolated tests. Verify migration 004 against a
 backup of the existing SQLite database before bridge rollout.
 
 **Your manual input:** choose the authentication approach/provider and target

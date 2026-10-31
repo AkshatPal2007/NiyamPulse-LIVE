@@ -449,6 +449,108 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v2/admin/evaluations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Evaluate */
+        post: operations["evaluate_api_v2_admin_evaluations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/admin/evaluations/latest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Evaluation Latest */
+        get: operations["evaluation_latest_api_v2_admin_evaluations_latest_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/admin/notices/{notice_id}/source.pdf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Admin Pdf */
+        get: operations["admin_pdf_api_v2_admin_notices__notice_id__source_pdf_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/admin/notices/{notice_id}/pages/{page_number}.png": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Admin Page */
+        get: operations["admin_page_api_v2_admin_notices__notice_id__pages__page_number__png_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/me/notifications/{notification_id}/source.pdf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Own Pdf */
+        get: operations["own_pdf_api_v2_me_notifications__notification_id__source_pdf_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/me/notifications/{notification_id}/pages/{page_number}.png": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Own Page */
+        get: operations["own_page_api_v2_me_notifications__notification_id__pages__page_number__png_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v2/admin/processing/{notice_id}/retry": {
         parameters: {
             query?: never;
@@ -460,6 +562,23 @@ export interface paths {
         put?: never;
         /** Retry Processing */
         post: operations["retry_processing_api_v2_admin_processing__notice_id__retry_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/admin/notices/{notice_id}/audio": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Audio */
+        post: operations["preview_audio_api_v2_admin_notices__notice_id__audio_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -630,6 +749,40 @@ export interface paths {
         put?: never;
         /** Change Password */
         post: operations["change_password_api_v2_auth_password_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/me/voice-search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Voice Search */
+        post: operations["voice_search_api_v2_me_voice_search_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/me/notifications/{notification_id}/audio": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Audio */
+        post: operations["audio_api_v2_me_notifications__notification_id__audio_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1161,6 +1314,8 @@ export interface components {
              * @default true
              */
             adult_accounts_only: boolean;
+            /** Support Email */
+            support_email?: string | null;
         };
         /** AuthSession */
         AuthSession: {
@@ -1195,6 +1350,11 @@ export interface components {
             kind: components["schemas"]["DocumentKind"];
             /** Source Url */
             source_url?: string | null;
+        };
+        /** Body_voice_search_api_v2_me_voice_search_post */
+        Body_voice_search_api_v2_me_voice_search_post: {
+            /** File */
+            file: string;
         };
         /** CatalogResponse */
         CatalogResponse: {
@@ -1396,6 +1556,38 @@ export interface components {
              * Format: email
              */
             email: string;
+        };
+        /** EvaluationReport */
+        EvaluationReport: {
+            /** Run Id */
+            run_id: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Dataset Label
+             * @default DECLARED_SYNTHETIC_TEXT
+             * @constant
+             */
+            dataset_label: "DECLARED_SYNTHETIC_TEXT";
+            /** Dataset Sha256 */
+            dataset_sha256: string;
+            /** Engine Version */
+            engine_version: string;
+            /** Cases */
+            cases: number;
+            /** Profiles */
+            profiles: number;
+            /** Correct Transitions */
+            correct_transitions: number;
+            /** Counts Match */
+            counts_match: boolean;
+            /** Deterministic Replay */
+            deterministic_replay: boolean;
+            /** Limitations */
+            limitations: string[];
         };
         /** EventFeedResponse */
         EventFeedResponse: {
@@ -1876,6 +2068,27 @@ export interface components {
             /** Diagnostics */
             diagnostics?: string[];
         };
+        /** NoticeAudio */
+        NoticeAudio: {
+            /** Text */
+            text: string;
+            /** Audio Base64 */
+            audio_base64: string;
+            /**
+             * Content Type
+             * @default audio/wav
+             * @constant
+             */
+            content_type: "audio/wav";
+            /** Cache Hit */
+            cache_hit: boolean;
+            /**
+             * Model
+             * @default bulbul:v4-flash
+             * @constant
+             */
+            model: "bulbul:v4-flash";
+        };
         /** NoticeChange */
         NoticeChange: {
             /** Change Id */
@@ -2240,6 +2453,10 @@ export interface components {
             reason_codes: string[];
             before?: components["schemas"]["DecisionStatus"] | null;
             after?: components["schemas"]["DecisionStatus"] | null;
+            /** Before Checks */
+            before_checks?: components["schemas"]["RuleCheck"][];
+            /** After Checks */
+            after_checks?: components["schemas"]["RuleCheck"][];
         };
         /**
          * RecipientRelevance
@@ -2361,7 +2578,7 @@ export interface components {
              */
             model: string;
             /** Budget Limit Paise */
-            budget_limit_paise: number;
+            budget_limit_paise: number | null;
             /** Reserved Paise */
             reserved_paise: number;
             /** Requests */
@@ -2691,6 +2908,21 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /** VoiceSearchResult */
+        VoiceSearchResult: {
+            /** Transcript */
+            transcript: string;
+            /** Language Code */
+            language_code: string;
+            /** Exam Ids */
+            exam_ids?: string[];
+            /**
+             * Action Taken
+             * @default false
+             * @constant
+             */
+            action_taken: false;
         };
         /** WatcherHealth */
         WatcherHealth: {
@@ -3692,6 +3924,202 @@ export interface operations {
             };
         };
     };
+    evaluate_api_v2_admin_evaluations_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvaluationReport"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    evaluation_latest_api_v2_admin_evaluations_latest_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvaluationReport"] | null;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    admin_pdf_api_v2_admin_notices__notice_id__source_pdf_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                notice_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    admin_page_api_v2_admin_notices__notice_id__pages__page_number__png_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                notice_id: string;
+                page_number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    own_pdf_api_v2_me_notifications__notification_id__source_pdf_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                notification_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    own_page_api_v2_me_notifications__notification_id__pages__page_number__png_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                notification_id: string;
+                page_number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     retry_processing_api_v2_admin_processing__notice_id__retry_post: {
         parameters: {
             query?: never;
@@ -3712,6 +4140,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProcessingJob"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_audio_api_v2_admin_notices__notice_id__audio_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                notice_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoticeAudio"];
                 };
             };
             /** @description Validation Error */
@@ -4002,6 +4463,74 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    voice_search_api_v2_me_voice_search_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_voice_search_api_v2_me_voice_search_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoiceSearchResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    audio_api_v2_me_notifications__notification_id__audio_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                notification_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoticeAudio"];
+                };
             };
             /** @description Validation Error */
             422: {

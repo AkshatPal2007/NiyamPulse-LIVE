@@ -4,7 +4,7 @@ export class ApiFailure extends Error {
 
 export async function requestApi<T>(path:string, csrf?:string, options:RequestInit={}):Promise<T> {
   const response=await fetch('/api/v2'+path,{...options,credentials:'include',headers:{
-    ...(options.body?{'Content-Type':'application/json'}:{}),
+    ...(options.body&&!(options.body instanceof FormData)?{'Content-Type':'application/json'}:{}),
     ...(csrf&&options.method&&options.method!=='GET'?{'X-CSRF-Token':csrf}:{}),...options.headers,
   }})
   if(!response.ok) {

@@ -1,0 +1,10 @@
+import {useEffect,useState} from 'react'
+import type {components} from './generated/api'
+type Report=components['schemas']['EvaluationReport']
+type Api=<T>(path:string,options?:RequestInit)=>Promise<T>
+export function EvaluationPanel({api}:{api:Api}){
+  const [report,setReport]=useState<Report|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('')
+  useEffect(()=>{let active=true;api<Report|null>('/admin/evaluations/latest').then(value=>{if(active)setReport(value)}).catch(reason=>{if(active)setError((reason as Error).message)});return()=>{active=false}},[api])
+  async function run(){setBusy(true);setError('');try{setReport(await api<Report>('/admin/evaluations',{method:'POST'}))}catch(reason){setError((reason as Error).message)}finally{setBusy(false)}}
+  return <section className="panel evaluation-panel spaced"><div className="section-head"><div><span className="eyebrow">DECLARED SYNTHETIC DATA · LOCAL ENGINE</span><h2>Measured, not assumed.</h2></div><button className="button secondary small" disabled={busy} onClick={()=>void run()}>{busy?'Evaluating…':'Run deterministic benchmark'}</button></div>{error&&<p role="alert">{error}</p>}{report?<><div className="evaluation-results"><div><strong>{report.correct_transitions}/{report.profiles}</strong><span>Gold transitions matched</span></div><div><strong>{report.cases}</strong><span>Synthetic text cases</span></div><div><strong>{report.deterministic_replay?'Matched':'Mismatch'}</strong><span>Repeated replay</span></div><div><strong>{report.counts_match?'Matched':'Mismatch'}</strong><span>Aggregate gold counts</span></div></div><p className="muted">Persisted {new Date(report.created_at).toLocaleString('en-IN')} · Engine {report.engine_version}</p><details><summary>Dataset scope and limitations</summary>{report.limitations.map(line=><p key={line}>{line}</p>)}<code>Dataset SHA-256 {report.dataset_sha256}</code></details></>:<p className="muted">No persisted evaluation run yet. Run the built-in, declared synthetic text corpus to generate a measured scorecard. No paid API calls or production applicant records are used.</p>}</section>
+}

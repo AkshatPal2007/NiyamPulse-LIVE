@@ -87,6 +87,8 @@ def create_app(store=None, *, clock=None, enable_watchers=True, v2_demo=None, en
     app.include_router(router)
     from backend.api.auth import router as auth_router
     app.include_router(auth_router)
+    from backend.api.voice import router as voice_router
+    app.include_router(voice_router)
     from fastapi.responses import FileResponse
     from fastapi.staticfiles import StaticFiles
     frontend_dist=Path(__file__).resolve().parents[1]/"frontend"/"dist"
@@ -142,7 +144,7 @@ def create_app(store=None, *, clock=None, enable_watchers=True, v2_demo=None, en
         response.headers['X-Content-Type-Options']='nosniff'
         response.headers['X-Frame-Options']='DENY'
         response.headers['Referrer-Policy']='no-referrer'
-        response.headers['Permissions-Policy']='camera=(), microphone=(), geolocation=()'
+        response.headers['Permissions-Policy']='camera=(), microphone=(self), geolocation=()'
         connect="'self'" if account_settings.production else "'self' ws://localhost:5173 ws://127.0.0.1:5173"
         response.headers['Content-Security-Policy']="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src "+connect+"; object-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
         if path.startswith('/api/'):response.headers['Cache-Control']='no-store'

@@ -5,6 +5,8 @@ __pycache__/
 .coverage
 htmlcov/
 .env
+# Local user experiment contains a credential; keep it outside version control.
+/check.py
 .env.*
 !.env.example
 node_modules/

@@ -11,6 +11,7 @@ class AccountRequestLimit:
             return await self.app(scope,receive,send)
         path=scope['path']
         limit=self.limit if path.startswith('/api/v2/auth/') else 256*1024
+        if path=='/api/v2/me/voice-search':limit=1024*1024+64*1024
         if path.startswith('/api/v1/workspaces/') and path.endswith('/documents') and scope['method']=='POST':
             from backend.services.pdf_intake import MAX_PDF_BYTES
             limit=MAX_PDF_BYTES+64*1024

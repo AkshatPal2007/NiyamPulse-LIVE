@@ -499,3 +499,51 @@ an archive; no real users or default administrator passwords are fabricated.
   financial/cache ledger. Restore verifies its SHA-256 manifest, requires a new
   destination and revokes all sessions/action tokens. It never overwrites live data.
   Operational preflight is a local check, not evidence of a hosted deployment.
+
+## Sarvam policy update — 31 October 2026
+
+The user removed the local INR 50 cap while retaining the 500-credit reserve.
+`SarvamHealth.budget_limit_paise` is now `integer | null`; null explicitly means
+no local INR cap. The persistent metadata flag `sarvam_budget_uncapped=1` enables
+this mode without deleting reservations or changing the provider key. Finite caps
+can be restored through the operator CLI. `backend.analyze --uncapped` changes only
+this policy; it does not submit work. The 15-minute manually refreshed balance,
+per-call reservation, single-source limits, evidence guards and human review remain.
+This is not unrestricted key exposure or automatic source approval. Keys stay on
+the backend. Sarvam-105B, Vision and the bounded Saaras/Bulbul routes below are implemented.
+
+## Final feature increment — source detail, accessibility and evaluation
+
+- RecipientMatch adds `before_checks`/`after_checks` arrays of the preserved v1
+  RuleCheck DTO (default empty for historical alerts). New rule-change matches
+  persist actual engine checks; unchanged overall states may still have evaluated
+  checks. A transition animation requires non-null, different overall states.
+- Profile settings expose explicit opt-in adult-own DOB, marks, integer INR income
+  and document codes/inventory completeness. Real-runtime personal DOB under 18 is
+  refused; guardians must not enter a child's data. Erasure/opt-out remains usable.
+- AuthConfig adds optional public `support_email`; configured through
+  PUBLIC_SUPPORT_EMAIL. Owner explicitly authorized their Gmail as public contact.
+- POST `/api/v2/me/voice-search`: authenticated, CSRF protected, multipart `file`,
+  mono PCM WAV 16 kHz/16 bit, <=25 sec and <=1 MiB. Returns VoiceSearchResult
+  {transcript,language_code,exam_ids,action_taken:false}. Saaras:v4 only transcribes;
+  suggested catalog matches never subscribe/change an account automatically.
+- POST `/api/v2/me/notifications/{id}/audio`: owner only; POST
+  `/api/v2/admin/notices/{id}/audio`: admin preview of an already approved update.
+  Returns NoticeAudio {text,audio_base64,content_type:"audio/wav",cache_hit,model}.
+  Bulbul:v4-flash receives only reviewed text after exact-summary, numeric/date and
+  informational-status guards. No arbitrary client synthesis text. Recordings are
+  not persisted; source-only generated audio is cached. All live calls share the
+  existing reservation ledger/500-credit floor. Failure does not auto-retry.
+  Microphone is permitted for self origin, with explicit browser/user activation.
+- Authenticated cached source PDF and PNG page endpoints are available under
+  `/admin/notices/{id}` and `/me/notifications/{id}` at `/source.pdf` and
+  `/pages/{1-based-page}.png`. Source hashes are verified before rendering. PNG
+  response X-Verified-Highlights counts exact native-text matches; OCR-only or
+  unmatched text receives no invented highlights. HTML sources retain official
+  links and literal excerpts rather than being served as executable HTML.
+- POST `/api/v2/admin/evaluations` runs the actual built-in synthetic text parser,
+  amendment planner and deterministic evaluator, compares supplied gold and repeats
+  replay. GET `/admin/evaluations/latest` returns EvaluationReport or null. Reports
+  are persisted separately from production notices/people. No scorecard before a
+  run; the scope is declared synthetic transition/count/replay agreement, not OCR,
+  model/source authenticity accuracy, baseline superiority or official eligibility.

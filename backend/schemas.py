@@ -355,6 +355,8 @@ class RecipientMatch(StrictModel):
     reason_codes: list[str] = Field(min_length=1)
     before: legacy.DecisionStatus | None = None
     after: legacy.DecisionStatus | None = None
+    before_checks: list[legacy.RuleCheck] = Field(default_factory=list)
+    after_checks: list[legacy.RuleCheck] = Field(default_factory=list)
     # Only populate before/after when checks have actually run on the
     # applicable scoped rule set; never fabricate official eligibility.
 
@@ -592,7 +594,7 @@ class CreditSafety(StrictModel):
 class SarvamHealth(StrictModel):
     status: Literal["NOT_CONFIGURED", "NOT_TESTED", "LIVE_OK", "ERROR"]
     model: str = "sarvam-105b"
-    budget_limit_paise: int = Field(ge=0)
+    budget_limit_paise: int | None = Field(ge=0)
     reserved_paise: int = Field(ge=0)
     requests: int = Field(ge=0)
     prompt_tokens: int = Field(ge=0)
@@ -699,6 +701,36 @@ class AuthConfig(StrictModel):
     email_delivery_configured: bool
     deployment_mode: Literal['local','production']
     adult_accounts_only: bool = True
+    support_email: EmailStr | None = None
+
+
+class VoiceSearchResult(StrictModel):
+    transcript: str = Field(max_length=4000)
+    language_code: str
+    exam_ids: list[Id] = Field(default_factory=list)
+    action_taken: Literal[False] = False
+
+
+class NoticeAudio(StrictModel):
+    text: str
+    audio_base64: str
+    content_type: Literal['audio/wav'] = 'audio/wav'
+    cache_hit: bool
+    model: Literal['bulbul:v4-flash'] = 'bulbul:v4-flash'
+
+
+class EvaluationReport(StrictModel):
+    run_id: Id
+    created_at: AwareDatetime
+    dataset_label: Literal['DECLARED_SYNTHETIC_TEXT'] = 'DECLARED_SYNTHETIC_TEXT'
+    dataset_sha256: Sha256
+    engine_version: str
+    cases: int = Field(ge=1)
+    profiles: int = Field(ge=1)
+    correct_transitions: int = Field(ge=0)
+    counts_match: bool
+    deterministic_replay: bool
+    limitations: list[str]
 
 
 class ServiceHealth(StrictModel):

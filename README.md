@@ -7,6 +7,8 @@ holders/guardians following school/engineering exam cycles. Browse reviewed sour
 notices, follow specific exam years/sessions, and receive matching in-app alerts.
 NiyamPulse is independent of exam organizers; original notices remain authoritative.
 
+Current scope, verification and remaining acceptance: [final development report](docs/FINAL_DEVELOPMENT_REPORT.md) and [progress](PROGRESS.md).
+
 ## Run on native Windows
 
 Python 3.12 and Node.js LTS. Existing dependencies/build are prepared on this machine.
@@ -77,3 +79,10 @@ confirmed real admin access and SMTP authentication passes. No hosting was
 provisioned. Current SQLite/worker/SMTP architecture cannot use Render Free or
 Vercel Functions safely; the guide explains the additional migration for a free
 hosted backend. The paid Render example is review-only, not an automatic deployment.
+
+> Current override, 31 October: user removed the local INR 50 cap and retained the
+> 500-credit floor. `python -m backend.analyze --uncapped` is persisted without
+> resetting the ledger. Fresh manual balance snapshots still expire after 15 minutes.
+> Live 105B extraction and Vision OCR succeeded in this increment. Voice input/TTS
+> remain unimplemented. See PROGRESS.md (repository root) for current evidence.
+> GitHub CI capture-byte fix is prepared; both remote jobs must be rerun after push.

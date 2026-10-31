@@ -87,6 +87,13 @@ class ExamService:
             if row is None: raise ServiceError(404,"PROFILE_NOT_FOUND","Profile not found")
             data=json.loads(row[0])
             if patch is not None: data |= patch.model_dump(mode="json",exclude_unset=True)
+            if not self.demo and not clear and data.get('personalization_opt_in') and data.get('date_of_birth'):
+                from datetime import date
+                born=date.fromisoformat(str(data['date_of_birth']))
+                today=self.clock().astimezone(timezone(timedelta(hours=5,minutes=30))).date()
+                age=today.year-born.year-((today.month,today.day)<(born.month,born.day))
+                if age<18:raise ServiceError(422,'ADULT_PROFILE_ONLY','Personalization accepts only the adult account holder’s own details')
+
             if clear or (patch is not None and patch.personalization_opt_in is False):
                 data |= dict(personalization_opt_in=False,date_of_birth=None,marks_percent=None,annual_household_income_inr=None,available_document_codes=[],document_inventory_complete=False)
             if patch is not None or clear: data["updated_at"]=utc_text(self.clock())
@@ -329,6 +336,7 @@ class ExamService:
                     user_id=sub.user_id,subscription_id=sub.subscription_id,
                     relevance=relevance,reason_codes=reason_codes,
                     before=imp.before,after=imp.after,
+                    before_checks=imp.before_checks,after_checks=imp.after_checks,
                 )
             else:
                 match=s.RecipientMatch(

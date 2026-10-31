@@ -180,6 +180,58 @@ def processing_queue(request:Request,user=Depends(admin)):
     return request.app.state.processing_service.queue()
 
 
+@router.post('/admin/evaluations',response_model=s.EvaluationReport)
+def evaluate(request:Request,user=Depends(admin)):
+    from backend.evaluate import run_evaluation
+    request.app.state.auth_service._rate('evaluate',user.get('email',user['id']),'local-evaluation',limit=3,window=3600)
+    return run_evaluation(service(request).store)
+
+
+@router.get('/admin/evaluations/latest',response_model=s.EvaluationReport|None)
+def evaluation_latest(request:Request,user=Depends(admin)):
+    from backend.evaluate import latest
+    return latest(service(request).store)
+
+
+def evidence_response(request,notice_id,page_number=None):
+    from fastapi.responses import Response
+    from backend.services.evidence import source_bytes,pdf_page
+    if page_number is not None:
+        image,count=pdf_page(service(request).store,notice_id,page_number)
+        return Response(image,media_type='image/png',headers={'X-Verified-Highlights':str(count)})
+    notice,raw,kind=source_bytes(service(request).store,notice_id)
+    if not raw.startswith(b'%PDF-'):raise ServiceError(415,'SOURCE_NOT_PDF','This source is a web listing; open its official link')
+    return Response(raw,media_type='application/pdf',headers={'Content-Disposition':'inline; filename="official-notice.pdf"'})
+
+
+@router.get('/admin/notices/{notice_id}/source.pdf')
+def admin_pdf(notice_id:str,request:Request,user=Depends(admin)):
+    return evidence_response(request,notice_id)
+
+
+@router.get('/admin/notices/{notice_id}/pages/{page_number}.png')
+def admin_page(notice_id:str,page_number:int,request:Request,user=Depends(admin)):
+    return evidence_response(request,notice_id,page_number)
+
+
+@router.get('/me/notifications/{notification_id}/source.pdf')
+def own_pdf(notification_id:str,request:Request,user=Depends(current_user)):
+    item=service(request).notification(user['id'],notification_id)
+    return evidence_response(request,item.notice.notice_id)
+
+
+@router.get('/me/notifications/{notification_id}/pages/{page_number}.png')
+def own_page(notification_id:str,page_number:int,request:Request,user=Depends(current_user)):
+    item=service(request).notification(user['id'],notification_id)
+    return evidence_response(request,item.notice.notice_id,page_number)
+
+
 @router.post('/admin/processing/{notice_id}/retry',response_model=s.ProcessingJob)
 def retry_processing(notice_id:str,request:Request,user=Depends(admin)):
     return request.app.state.processing_service.retry(notice_id)
+
+
+@router.post('/admin/notices/{notice_id}/audio',response_model=s.NoticeAudio)
+def preview_audio(notice_id:str,request:Request,user=Depends(admin)):
+    from backend.api.voice import service as voice_service
+    return voice_service(request,user).preview(notice_id)

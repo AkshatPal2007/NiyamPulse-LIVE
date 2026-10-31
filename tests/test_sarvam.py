@@ -74,6 +74,23 @@ def test_budget_and_http_failure_are_persisted_without_secret_leak(client):
     assert len(calls)==1
 
 
+def test_uncapped_policy_preserves_floor_expiry_and_existing_ledger(client):
+    svc,notice,calls=setup_service(client)
+    svc.set_budget(None)
+    assert svc.health().budget_limit_paise is None
+    svc.record_credit_balance(50499)
+    with pytest.raises(ServiceError) as error:svc._reserve('floor-test')
+    assert error.value.code=='SARVAM_CREDIT_RESERVE_PROTECTED'
+    svc.record_credit_balance(59812)
+    svc._reserve('admitted-test')
+    assert svc.health().reserved_paise==500
+    svc.set_budget(500)
+    assert svc.health().budget_limit_paise==500
+    with pytest.raises(ServiceError) as error:svc._reserve('limited-test')
+    assert error.value.code=='SARVAM_BUDGET_EXCEEDED'
+    assert not calls
+
+
 def test_dates_and_false_topic_mapping_fail_closed():
     pages=['Application deadline: 31 October 2026.']
     item=candidate('Application deadline: 31 October 2026.')

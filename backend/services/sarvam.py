@@ -182,10 +182,18 @@ class SarvamService:
         self.credential_fingerprint = hashlib.sha256(self.api_key.encode()).hexdigest()
 
     def set_budget(self, limit_paise):
-        if type(limit_paise) is not int or not 0 <= limit_paise <= 5000:
-            raise ValueError("This phase supports an explicit budget up to INR 50")
+        if limit_paise is not None and (type(limit_paise) is not int or not 0 <= limit_paise < 2**63):
+            raise ValueError("Budget must be nonnegative whole paise or None for uncapped")
         with self.store.connect(write=True) as con:
-            con.execute("UPDATE v2_ai_budget SET limit_paise=? WHERE id=1", (limit_paise,))
+            if limit_paise is None:
+                con.execute("INSERT OR REPLACE INTO metadata VALUES ('sarvam_budget_uncapped','1')")
+            else:
+                con.execute("DELETE FROM metadata WHERE key='sarvam_budget_uncapped'")
+                con.execute("UPDATE v2_ai_budget SET limit_paise=? WHERE id=1", (limit_paise,))
+
+    def _limit(self, con):
+        unlimited=bool(con.execute("SELECT 1 FROM metadata WHERE key='sarvam_budget_uncapped' AND value='1'").fetchone())
+        return (2**63-1 if unlimited else con.execute('SELECT limit_paise FROM v2_ai_budget WHERE id=1').fetchone()[0]),unlimited
 
     def record_credit_balance(self, balance_hundredths):
         if type(balance_hundredths)!=int or not 0<=balance_hundredths<=999999999:
@@ -209,13 +217,13 @@ class SarvamService:
 
     def health(self):
         with self.store.connect() as con:
-            limit = con.execute("SELECT limit_paise FROM v2_ai_budget WHERE id=1").fetchone()[0]
+            limit,unlimited = self._limit(con)
             stats = con.execute("SELECT count(*),coalesce(sum(reserved_paise),0),coalesce(sum(prompt_tokens),0),coalesce(sum(completion_tokens),0) FROM v2_ai_calls").fetchone()
             last = con.execute("SELECT * FROM v2_ai_calls WHERE credential_fingerprint=? ORDER BY rowid DESC LIMIT 1", (self.credential_fingerprint,)).fetchone()
             credit_safety=self._credit_safety(con,stats[1],limit)
             success = con.execute("SELECT max(finished_at) FROM v2_ai_calls WHERE credential_fingerprint=? AND status='SUCCESS'", (self.credential_fingerprint,)).fetchone()[0]
         status = "NOT_CONFIGURED" if not self.api_key else "NOT_TESTED" if last is None else "LIVE_OK" if last['status'] == 'SUCCESS' else 'ERROR'
-        return s.SarvamHealth(status=status, credit_safety=credit_safety, budget_limit_paise=limit, reserved_paise=stats[1], requests=stats[0], prompt_tokens=stats[2], completion_tokens=stats[3], last_success_at=success, last_error_code=last['error_code'] if last else None)
+        return s.SarvamHealth(status=status, credit_safety=credit_safety, budget_limit_paise=None if unlimited else limit, reserved_paise=stats[1], requests=stats[0], prompt_tokens=stats[2], completion_tokens=stats[3], last_success_at=success, last_error_code=last['error_code'] if last else None)
 
     def _reserve(self, key):
         if not self.api_key: raise ServiceError(503, "SARVAM_NOT_CONFIGURED", "Configure SARVAM_API_KEY in the backend environment")
@@ -225,7 +233,7 @@ class SarvamService:
                 raise ServiceError(409,"ANALYSIS_CACHE_READY","Result completed concurrently; refresh to reuse its cache")
             pending = con.execute("SELECT 1 FROM v2_ai_calls WHERE cache_key=? AND status='RESERVED'", (key,)).fetchone()
             if pending: raise ServiceError(409, "ANALYSIS_IN_PROGRESS", "An extraction for this immutable input is already in progress")
-            limit = con.execute("SELECT limit_paise FROM v2_ai_budget WHERE id=1").fetchone()[0]
+            limit,_ = self._limit(con)
             used = con.execute("SELECT coalesce(sum(reserved_paise),0) FROM v2_ai_calls").fetchone()[0]
             if used + RESERVATION_PAISE > limit:
                 raise ServiceError(503, "SARVAM_BUDGET_EXCEEDED", "Local Sarvam test budget cannot admit another bounded request")

@@ -496,19 +496,16 @@ class TestFanoutWithBridge:
                             (profile.model_dump_json(), "demo-school"))
 
             notice, update = _minimal_notice_and_update(store, CYCLE_ID)
-            bridge = BridgeResult(
-                after_rules=(),
-                after_verified_hashes=frozenset(),
-                after_rule_set_sha256="a" * 64,
-                impacts=[PersonalImpactRow(
-                    user_id="demo-school",
-                    subscription_id="sub-placeholder",
-                    before=DecisionStatus.UNKNOWN,
-                    after=DecisionStatus.PASS,
+            bridge = apply_rule_bridge(
+                notice_changes=[s.NoticeChange(
+                    change_id="persisted-check", notice_id=FAKE_NOTICE_ID,
+                    rule_type=s.RuleChangeType.MINIMUM_MARKS, operation="ADD",
+                    proposed_rule=_marks_rule("persisted-marks", 60.0),
+                    effective_from=date(2027,1,1), evidence=FAKE_EVIDENCE,
                 )],
-                notice_changes=[],
-                revoked_rule_ids=frozenset(),
-                added_rule_ids=frozenset(),
+                before_rules=[], before_verified_hashes=frozenset(),
+                scheme_id=CYCLE_ID, cycle_id=CYCLE_ID, as_of_date=TODAY,
+                subscribers=[("demo-school", "sub-placeholder", _applicant("demo-school", marks=75.0))],
             )
             with store.connect(write=True) as con:
                 svc._fanout(con, notice, update, NOW, bridge_result=bridge)
@@ -521,6 +518,9 @@ class TestFanoutWithBridge:
             assert m.relevance == s.RecipientRelevance.PERSONAL_IMPACT
             assert m.before == DecisionStatus.UNKNOWN
             assert m.after == DecisionStatus.PASS
+            assert m.after_checks and m.after_checks == bridge.impacts[0].after_checks
+            assert m.before_checks == bridge.impacts[0].before_checks
+
         finally:
             directory.cleanup()
 

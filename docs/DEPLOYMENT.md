@@ -160,3 +160,10 @@ our trusted local Python-generated schema; none of it enters the shipped browser
 code. Track an upstream compatible fix. Do not accept arbitrary remote schemas or
 force major transitive replacements merely to suppress the report. This audit does
 not certify the whole application's security.
+
+> Current override, 31 October: user removed the local INR 50 cap and retained the
+> 500-credit floor. `python -m backend.analyze --uncapped` is persisted without
+> resetting the ledger. Fresh manual balance snapshots still expire after 15 minutes.
+> Live 105B extraction and Vision OCR succeeded in this increment. Voice input/TTS
+> remain unimplemented. See PROGRESS.md (repository root) for current evidence.
+> GitHub CI capture-byte fix is prepared; both remote jobs must be rerun after push.

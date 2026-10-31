@@ -17,12 +17,15 @@ def main():
     parser.add_argument('--balance-credits',type=Decimal,help='Just-refreshed manual organisation credits balance; expires after 15 minutes, floor 500')
     parser.add_argument('--notice',help='Stored notice ID')
     parser.add_argument('--ocr',action='store_true',help='Recover stored PDF text using Sarvam Vision')
-    parser.add_argument('--budget-inr',type=Decimal,help='Explicit total local reservation cap, at most 50 INR')
+    budgets=parser.add_mutually_exclusive_group()
+    budgets.add_argument('--budget-inr',type=Decimal,help='Explicit total local reservation cap in INR')
+    budgets.add_argument('--uncapped',action='store_true',help='Remove the local INR cap; retain the 500-credit reserve')
     parser.add_argument('--data-dir',type=Path)
     args=parser.parse_args()
     load_dotenv(Path(__file__).resolve().parents[1]/'.env')
     store=ExamStore((args.data_dir or Path(os.environ.get('NIYAMPULSE_DATA_DIR','var/production')))/'niyampulse.sqlite3')
     service=SarvamService(store)
+    if args.uncapped:service.set_budget(None)
     if args.budget_inr is not None:
         amount=args.budget_inr*100
         if amount!=amount.to_integral_value():parser.error('Budget supports whole paise only')

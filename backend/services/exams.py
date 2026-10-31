@@ -66,7 +66,7 @@ class ExamService:
                 for saved in recent:
                     update=s.NoticeUpdate.model_validate_json(saved['update_payload'])
                     notice=s.DetectedNotice.model_validate_json(saved['notice_payload'])
-                    if update.rule_changes or update.published_at<self.clock()-timedelta(days=30):continue
+                    if update.rule_changes:continue
                     if notice.source_kind!=s.SourceKind.OFFICIAL_WEB_LISTING or notice.review_status!=s.ReviewStatus.APPROVED:continue
                     self._fanout(con,notice,update,self.clock(),only_subscription_id=item.subscription_id)
             return item

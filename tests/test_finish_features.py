@@ -96,6 +96,9 @@ def test_cached_pdf_page_has_verified_highlights_and_keeps_original(client):
     path='/api/v2/admin/notices/'+notice.notice_id+'/source.pdf'
     assert client.get(path,headers=learner).status_code==403
     assert client.get(path,headers=operator).content==raw
+    page_response=client.get('/api/v2/admin/notices/'+notice.notice_id+'/pages/1.png',headers=operator)
+    assert page_response.status_code==200 and page_response.content.startswith(b'\x89PNG')
+    assert int(page_response.headers['X-Verified-Highlights'])>0
     assert client.get('/api/v2/me/notifications/not-owned/source.pdf',headers=learner).status_code==404
 
 

@@ -15,11 +15,103 @@ function pcmWav(chunks:Float32Array[],rate:number){
 }
 
 export function VoiceSearch({api,onSearch}:{api:Api;onSearch:(query:string,examId?:string)=>void}){
-  const [recording,setRecording]=useState(false),[seconds,setSeconds]=useState(0),[clip,setClip]=useState<Blob|null>(null),[result,setResult]=useState<Models['VoiceSearchResult']|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false)
-  const stopRef=useRef<(()=>void)|null>(null),alive=useRef(true)
-  const [preparing,setPreparing]=useState(false)
-  useEffect(()=>{alive.current=true;return()=>{alive.current=false;stopRef.current?.()}},[])
-  async function record(){setError('');setResult(null);setClip(null);setPreparing(true)
+  const [recording,setRecording]=useState(false)
+  const [seconds,setSeconds]=useState(0)
+  const [transcript,setTranscript]=useState('')
+  const [browserSpeech,setBrowserSpeech]=useState(false)
+  const [error,setError]=useState('')
+  const [busy,setBusy]=useState(false)
+  const stopRef=useRef<(()=>void)|null>(null)
+  const recogRef=useRef<any>(null)
+  const alive=useRef(true)
+
+  useEffect(()=>{
+    alive.current=true
+    return()=>{
+      alive.current=false
+      stopRef.current?.()
+      recogRef.current?.stop?.()
+    }
+  },[])
+
+  async function handleAudioUpload(clip:Blob){
+    setBusy(true)
+    setError('')
+    try{
+      const form=new FormData()
+      form.append('file',clip,'query.wav')
+      const result=await api<Models['VoiceSearchResult']>('/me/voice-search',{method:'POST',body:form})
+      if(result.transcript){
+        setTranscript(result.transcript)
+        onSearch(result.transcript,result.exam_ids?.[0])
+      }
+    }catch(reason){
+      setError((reason as Error).message)
+    }finally{
+      if(alive.current)setBusy(false)
+    }
+  }
+
+  function startWebSpeech(SpeechRecog:any){
+    try{
+      const recog=new SpeechRecog()
+      recogRef.current=recog
+      recog.lang='hi-IN'
+      recog.continuous=false
+      recog.interimResults=true
+      recog.maxAlternatives=1
+      let finalSpeech=''
+
+      recog.onresult=(event:any)=>{
+        let interim=''
+        for(let i=event.resultIndex;i<event.results.length;++i){
+          if(event.results[i].isFinal){
+            finalSpeech+=event.results[i][0].transcript
+          }else{
+            interim+=event.results[i][0].transcript
+          }
+        }
+        const text=finalSpeech||interim
+        if(text&&alive.current)setTranscript(text)
+      }
+
+      recog.onerror=(event:any)=>{
+        if(event.error!=='no-speech'&&alive.current){
+          setError('Speech recognition issue: '+event.error+'. You can type your query below.')
+        }
+        if(alive.current)setRecording(false)
+      }
+
+      recog.onend=()=>{
+        if(alive.current){
+          setRecording(false)
+          if(finalSpeech.trim()){
+            onSearch(finalSpeech.trim())
+          }
+        }
+      }
+
+      recog.start()
+      setRecording(true)
+      setSeconds(0)
+      const started=performance.now()
+      const timer=window.setInterval(()=>{
+        if(alive.current)setSeconds(Math.floor((performance.now()-started)/1000))
+      },250)
+
+      stopRef.current=()=>{
+        window.clearInterval(timer)
+        try{recog.stop()}catch(_){}
+        if(alive.current)setRecording(false)
+        stopRef.current=null
+      }
+      return true
+    }catch(_){
+      return false
+    }
+  }
+
+  async function startNativeRecord(){
     let stream:MediaStream|undefined,context:AudioContext|undefined
     const release=()=>{stream?.getTracks().forEach(track=>track.stop());void context?.close().catch(()=>{})}
     try{
@@ -30,15 +122,55 @@ export function VoiceSearch({api,onSearch}:{api:Api;onSearch:(query:string,examI
       const source=activeContext.createMediaStreamSource(stream),processor=activeContext.createScriptProcessor(4096,1,1),chunks:Float32Array[]=[]
       processor.onaudioprocess=event=>chunks.push(new Float32Array(event.inputBuffer.getChannelData(0)))
       source.connect(processor);processor.connect(activeContext.destination)
-      let active=true;const started=performance.now();const timer=window.setInterval(()=>{if(alive.current)setSeconds(Math.floor((performance.now()-started)/1000))},250)
+      let active=true;const started=performance.now()
+      const timer=window.setInterval(()=>{if(alive.current)setSeconds(Math.floor((performance.now()-started)/1000))},250)
       const timeout=window.setTimeout(()=>stopRef.current?.(),15000)
-      stopRef.current=()=>{if(!active)return;active=false;window.clearInterval(timer);window.clearTimeout(timeout);processor.disconnect();source.disconnect();release();if(alive.current){setRecording(false);setClip(pcmWav(chunks,activeContext.sampleRate))}stopRef.current=null}
+      stopRef.current=()=>{
+        if(!active)return
+        active=false
+        window.clearInterval(timer)
+        window.clearTimeout(timeout)
+        processor.disconnect()
+        source.disconnect()
+        release()
+        if(alive.current){
+          setRecording(false)
+          const clip=pcmWav(chunks,activeContext.sampleRate)
+          void handleAudioUpload(clip)
+        }
+        stopRef.current=null
+      }
       setSeconds(0);setRecording(true)
-    }catch{release();if(alive.current)setError('Microphone unavailable or permission declined. You can still type your search.')}
-    finally{if(alive.current)setPreparing(false)}
+    }catch(reason){
+      release()
+      if(alive.current){
+        setError(!window.isSecureContext?'Microphone needs HTTPS or localhost.':(reason as DOMException).name==='NotFoundError'?'No microphone was found.':'Microphone access was blocked. Allow Microphone permissions, or use typed search below.')
+      }
+    }
   }
-  async function transcribe(){if(!clip)return;setBusy(true);setError('');try{const form=new FormData();form.append('file',clip,'query.wav');setResult(await api<Models['VoiceSearchResult']>('/me/voice-search',{method:'POST',body:form}))}catch(reason){setError((reason as Error).message)}finally{setBusy(false)}}
-  return <section className="voice-search"><div><span className="eyebrow">ACCESSIBLE SEARCH</span><h3>Say the exam you’re looking for.</h3><p>Up to 15 seconds. Your clip is sent to Sarvam only when you select Transcribe; recordings are not saved by NiyamPulse. Voice never follows an exam automatically.</p></div><div className="voice-controls"><button className="button secondary small" disabled={busy||preparing} onClick={()=>recording?stopRef.current?.():void record()}>{recording?<Square size={15}/>:<Mic size={15}/>} {recording?`Stop · ${seconds}s`:'Record search'}</button>{clip&&<button className="button primary small" disabled={busy} onClick={()=>void transcribe()}>{busy?<LoaderCircle className="spin" size={15}/>:<Mic size={15}/>}Transcribe with Sarvam</button>}</div>{error&&<p role="alert" className="voice-error">{error}</p>}{result&&<div className="voice-transcript"><span className="eyebrow">CHECK YOUR TRANSCRIPT · {result.language_code}</span><p>{result.transcript}</p><button className="text-button" onClick={()=>onSearch(result.transcript,result.exam_ids?.[0])}><Search size={15}/>Use this search</button></div>}</section>
+
+  function toggleVoice(){
+    setError('')
+    if(recording){
+      stopRef.current?.()
+      return
+    }
+    setTranscript('')
+    const SpeechRecog=(window as any).SpeechRecognition||(window as any).webkitSpeechRecognition
+    if(SpeechRecog&&browserSpeech){
+      const ok=startWebSpeech(SpeechRecog)
+      if(ok)return
+    }
+    void startNativeRecord()
+  }
+
+  return <section className="voice-search">
+    <div className="voice-copy"><span className="eyebrow">ASK IN YOUR OWN WORDS</span><h3>Speak your exam question.</h3><p>Hindi, Hinglish or English. Stop recording to search reviewed official notices with Sarvam Saaras.</p></div>
+    <div className="voice-controls"><button className={'button '+(recording?'primary':'secondary')+' small'} disabled={busy} onClick={toggleVoice} aria-label={recording?'Stop and search':'Tap to speak'}>{busy?<LoaderCircle className="spin" size={18}/>:recording?<Square size={18}/>:<Mic size={18}/>} {busy?'Searching…':recording?`Stop & search · ${seconds}s`:'Ask with voice'}</button></div>
+    <details className="voice-options"><summary>Speech & privacy settings</summary><p>Your clip is sent for transcription when you stop. Recordings are not saved by this app.</p><label className="checkbox-label"><input type="checkbox" checked={browserSpeech} disabled={recording||busy} onChange={event=>setBrowserSpeech(event.target.checked)}/>Use browser speech instead (may send audio to your browser’s provider)</label></details>
+    {error&&<p role="alert" className="voice-error">{error}</p>}
+    {transcript&&<div className="voice-transcript"><span className="eyebrow">{recording?'LISTENING':'YOUR QUESTION'}</span><p lang="hi">{transcript}</p></div>}
+  </section>
 }
 
 export function NoticeNarration({api,path}:{api:Api;path:string}){

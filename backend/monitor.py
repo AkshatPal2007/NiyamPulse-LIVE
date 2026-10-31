@@ -21,7 +21,14 @@ def main():
         parser.error("--enable requires --check SOURCE_ID and --discover")
     if args.check:
         monitor=SourceMonitor(ExamStore(args.data_dir/"niyampulse.sqlite3"))
-        result=monitor.check(args.check,dry_run=not args.discover,enable=args.enable)
+        from backend.storage import ServiceError
+        try:result=monitor.check(args.check,dry_run=not args.discover,enable=args.enable)
+        except ServiceError as error:
+            import json
+            deferred=error.code in {'SOURCE_CHECK_NOT_DUE','SOURCE_CHECK_IN_PROGRESS'}
+            print(json.dumps({'status':'DEFERRED' if deferred else 'ERROR','code':error.code,'message':str(error)}))
+            if not deferred:raise SystemExit(1) from None
+            return
         print(result.model_dump_json(indent=2))
         if result.errors: raise SystemExit(1)
         return

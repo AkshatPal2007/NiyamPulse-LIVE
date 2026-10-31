@@ -235,3 +235,9 @@ def retry_processing(notice_id:str,request:Request,user=Depends(admin)):
 def preview_audio(notice_id:str,request:Request,user=Depends(admin)):
     from backend.api.voice import service as voice_service
     return voice_service(request,user).preview(notice_id)
+
+
+@router.get('/me/notice-search',response_model=s.PublicUpdatesResponse)
+def notice_search(request:Request,q:str=Query('',max_length=4000),cycle_id:str|None=None,user=Depends(current_user)):
+    from backend.services.notice_search import search
+    return search(service(request),q,cycle_id)

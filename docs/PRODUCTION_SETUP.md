@@ -151,3 +151,28 @@ require the chosen host. No real credentials are used in automated tests.
 Primary security references: [OWASP password storage](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html),
 [OWASP session management](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html),
 [argon2-cffi](https://argon2-cffi.readthedocs.io/en/stable/api.html).
+
+## Administrator role missing on a deployed Render service
+
+Roles live in that service's SQLite database, not frontend/browser storage or Git.
+The owner's local account was verified as ADMIN; this does not promote a separately
+registered account in a fresh Render database. Never commit/copy the live SQLite
+file into a public repository or add an email-based role bypass.
+
+Open the running backend service's Render Shell (not a build/pre-deploy command
+or isolated ephemeral instance). Verify the configured existing data file first:
+
+```sh
+python -c "import os; from pathlib import Path; p=Path(os.environ['NIYAMPULSE_DATA_DIR'])/'niyampulse.sqlite3'; print(p); print('Database exists:',p.is_file())"
+python -m backend.accounts promote-admin --email akshatpc12345@gmail.com
+```
+
+Type PROMOTE when prompted. This requires an existing verified real account,
+changes its stored server-side role and revokes its sessions. Sign in again after
+promotion. If VERIFIED_ACCOUNT_REQUIRED appears, register/verify the mailbox on
+the deployed app first, then rerun. Do not bypass mailbox verification.
+
+NIYAMPULSE_DATA_DIR must refer to the application's existing data directory beneath
+the attached disk mount (including any restored subdirectory), not a different
+fresh directory. Only disk-backed paths survive Render redeploys. Do not change
+paths or overwrite the live database simply to assign a role.

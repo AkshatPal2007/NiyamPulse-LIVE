@@ -547,3 +547,28 @@ the backend. Sarvam-105B, Vision and the bounded Saaras/Bulbul routes below are 
   are persisted separately from production notices/people. No scorecard before a
   run; the scope is declared synthetic transition/count/replay agreement, not OCR,
   model/source authenticity accuracy, baseline superiority or official eligibility.
+
+## Follow-time exam brief and Hindi/Hinglish notice queries — 31 October
+
+Implemented authenticated GET `/api/v2/me/notice-search?q=...&cycle_id=...`.
+Queries deterministically filter reviewed official updates by recognized exam,
+explicit year/session and registration/schedule/admit-card/results topic. No LLM
+answers or guessed dates. Unrecognized/no verified matches returns an empty result.
+The existing Saaras transcript feeds this search after the user's confirmation;
+typed questions use the same route. No new paid speech call was made this increment.
+Following now opens My exams with a brief of existing reviewed notices, original
+quoted dates/source links, independent of the selected alert topics. The first
+notice opens by default; registration/schedule notices are prioritized. Dates can
+be past/superseded and are labeled accordingly. Existing informational inbox
+backfill no longer expires after 30 days (latest 20, idempotent and topic-filtered);
+historical rule notices do not manufacture retroactive personalized outcomes.
+Microphone errors distinguish insecure origin/missing device/access failure and
+provide browser/Windows permission guidance. Actual device permissions require
+manual verification. Production evidence/accounts/ledger remain untouched.
+
+Judging UI update: Saaras remains the default voice provider. Existing browser
+speech recognition is preserved only as a separately labeled opt-in alternative;
+that mode may use the browser provider and must not be described as a Sarvam call.
+Both paths only search reviewed notices; neither performs account actions.
+Source-check CLI scheduling/concurrency conflicts now return status DEFERRED,
+without claiming a network poll occurred. No HTTP contracts changed in this step.

@@ -115,7 +115,7 @@ def test_bad_origin_and_underage_declaration_fail_closed(accounts):
 
 
 def test_real_subscription_backfills_only_reviewed_real_notices(accounts):
-    from datetime import datetime,timezone
+    from datetime import datetime,timezone,timedelta
     from backend import schemas as s
     from backend.services.exams import ExamService
     from backend.services.source_monitor import SourceMonitor,parse_listing,FetchResult
@@ -126,12 +126,16 @@ def test_real_subscription_backfills_only_reviewed_real_notices(accounts):
     listing=(root/'upsc-listing.html').read_bytes()
     link=next(item for item in parse_listing(publisher,listing) if item.cycle_id=='upsc-ese:2027')
     notice,_=SourceMonitor(store).ingest(publisher,link,FetchResult(link.url,link.url,(root/'upsc-ese-2027.html').read_bytes(),'text/html',200),listing=FetchResult(str(publisher.listing_url),str(publisher.listing_url),listing,'text/html',200))
-    ExamService(store).review(notice.notice_id,s.NoticeReviewDecision(notice_id=notice.notice_id,reviewer_id='isolated-fixture-reviewer',action='APPROVE',reason='Isolated captured-source fixture acceptance',reviewed_at=datetime.now(timezone.utc),expected_revision=0),'isolated-fixture-reviewer')
+    ExamService(store,clock=lambda:datetime.now(timezone.utc)-timedelta(days=60)).review(notice.notice_id,s.NoticeReviewDecision(notice_id=notice.notice_id,reviewer_id='isolated-fixture-reviewer',action='APPROVE',reason='Isolated captured-source fixture acceptance',reviewed_at=datetime.now(timezone.utc),expected_revision=0),'isolated-fixture-reviewer')
     for _ in range(2):assert client.post('/api/v2/me/subscriptions',headers={'X-CSRF-Token':account['csrf_token']},json={'cycle_id':notice.cycle_id}).status_code in {200,201}
     inbox=client.get('/api/v2/me/notifications').json()
     assert len(inbox['notifications'])==1
     assert inbox['notifications'][0]['official_source_url']==link.url
 
+    brief=client.get('/api/v2/me/notice-search',params={'cycle_id':notice.cycle_id})
+    assert brief.status_code==200 and brief.json()['total']==1
+    assert brief.json()['updates'][0]['evidence']
+    assert client.get('/api/v2/me/notice-search',params={'q':'JEE Main session 1 ki registration last date kab hai?'}).json()['total']==0
 
 def test_reset_is_single_use_and_revokes_prior_sessions(accounts):
     client,store,mail=accounts

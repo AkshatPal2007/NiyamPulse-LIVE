@@ -281,6 +281,14 @@
       "phase": null,
       "display_name": "SSC CHSL 2026",
       "is_active": true
+    },
+    {
+      "cycle_id": "neet-ug:2026",
+      "exam_id": "neet-ug",
+      "year": 2026,
+      "phase": null,
+      "display_name": "NEET UG 2026 · post-exam notices",
+      "is_active": true
     }
   ]
 }

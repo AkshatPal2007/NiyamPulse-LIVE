@@ -140,7 +140,7 @@ class APISafetyTests(APIHarness):
     def test_pending_intake_recovers_on_startup(self):
         imported = self.client.app.state.service.import_pdf("workspace-demo", self.original, filename="queued.pdf", kind="ORIGINAL")
         self.assertEqual(self.store.document("workspace-demo", imported.document.document_id).extraction_state.value, "PENDING")
-        with TestClient(create_app(self.store, clock=self.client.app.state.service.clock)):
+        with TestClient(create_app(self.store, legacy_api_test=True, clock=self.client.app.state.service.clock)):
             self.assertEqual(self.store.document("workspace-demo", imported.document.document_id).extraction_state.value, "COMPLETE")
 
     def test_storage_sources_extractions_acquisition_snapshots_and_events_are_immutable(self):

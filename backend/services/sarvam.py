@@ -1,5 +1,5 @@
 """Bounded Sarvam extraction. Provider output is an untrusted candidate, never a decision."""
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timezone, timedelta
 import hashlib
 import json
 import os
@@ -15,7 +15,7 @@ from backend.storage import ServiceError, utc_text
 
 MODEL = "sarvam-105b"
 VERSION = "notice-facts-guard-v3"
-GUARD_VERSION = "exact-span-hindi-labels-v2"
+GUARD_VERSION = "explicit-rules-label-anchor-v7"
 RESERVATION_PAISE = 500
 MAX_INPUT_BYTES = 30000
 TOPIC_WORDS = {
@@ -24,7 +24,7 @@ TOPIC_WORDS = {
     "ADMIT_CARD": r"admit.card|hall.ticket",
     "ANSWER_KEY": r"answer.key", "RESULTS": r"result|score.card",
     "SYLLABUS": r"syllabus", "OTHER": r"\S",
-    "ELIGIBILITY": r"eligibility|eligible|qualification|age.limit|minimum.marks",
+    "ELIGIBILITY": r"eligibility|eligible|qualification|qualifying|age.limit|minimum\s*(?:\d+%)?\s*marks",
 }
 HINDI_TOPICS = {
     "REGISTRATION": "आवेदन / पंजीकरण से जुड़ी सूचना",
@@ -34,7 +34,17 @@ HINDI_TOPICS = {
     "OTHER": "स्रोत से जुड़ी सूचना",
     "ELIGIBILITY": "पात्रता की शर्तों से जुड़ी सूचना; मानवीय समीक्षा आवश्यक है",
 }
-RULE_WORDS = r"eligibility|minimum\s+marks|age\s+(?:limit|relaxation)|income\s+limit|domicile|reservation\s+(?:quota|criteria)"
+RULE_WORDS = r"\beligibility\b|minimum\s+(?:qualifying\s+)?marks|age\s+(?:limit|bounds|relaxation)|income\s+(?:limit|ceiling)|domicil|reservation\s+(?:quota|criteria)|medical\s+fitness|(?:must|shall)\s+(?:possess|hold)|(?:must|shall)\s+be\s+(?:aged|born|between|domiciled|medically|unmarried|married|a\s+(?:citizen|resident))|required\s+documents|maximum\s+(?:annual\s+)?(?:household\s+|family\s+)?income|Operation:\s*(?:ADD|REPLACE|REVOKE)"
+
+
+def requires_rule_review(text):
+    # Only these literal informational uses are excluded. Other eligibility prose
+    # remains review-only, including exemptions and unsupported qualifications.
+    text=re.sub(r"eligibility(?=\s+test\s+for\s+JEE\s*\(Advanced\))","selection",text,flags=re.I)
+    text=re.sub(r"For details of Papers,\s*Scheme,\s*Timing,\s*Eligibility and other information,\s*candidates are requested to refer to the Information Bulletin","Refer to the bulletin",text,flags=re.I)
+    text=re.sub(r"National\s+Eligibility[\s-]+cum[\s-]+Entrance[\s-]+Test","NEET",text,flags=re.I)
+    return bool(re.search(RULE_WORDS,text,re.I))
+
 
 
 def provider_schema():
@@ -101,7 +111,18 @@ def resolve_literal_spans(candidate,pages):
         if fact.literal_quote in page:continue
         pattern=r'\s+'.join(re.escape(token) for token in fact.literal_quote.split())
         matches=list(re.finditer(pattern,page))
-        if len(matches)!=1:raise ValueError('Quote has no unique whitespace-only source span')
+        if len(matches)!=1 and fact.kind=='ANNOUNCEMENT':
+            # An explicitly closed label/value field may be laid out with a newline
+            # instead of the model's colon. Values and all other punctuation stay exact.
+            for label in ('Date of Examination','Date of Notification','Date of Commencement of Examination','Last Date for Receipt of Applications','Date of Upload'):
+                prefix=label+': '
+                if fact.literal_quote.startswith(prefix):
+                    value=fact.literal_quote[len(prefix):]
+                    label_pattern=r'\s+'.join(re.escape(token) for token in label.split())
+                    value_pattern=r'\s+'.join(re.escape(token) for token in value.split())
+                    matches=list(re.finditer(label_pattern+r'\s+'+value_pattern,page))
+                    break
+        if len(matches)!=1:raise ValueError('Quote has no unique literal field/whitespace source span')
         fact.literal_quote=matches[0].group(0)
     return candidate
 
@@ -140,7 +161,7 @@ def verified_analysis(con, row, notice):
     try:
         cached = con.execute('SELECT payload FROM v2_ai_cache WHERE cache_key=?',(result.input_sha256,)).fetchone()
         original = resolve_literal_spans(s.SarvamCandidate.model_validate_json(json.loads(cached[0])['choices'][0]['message']['content']),json.loads(row['pages']))
-        if (result.notice_id != notice.notice_id or result.extraction_id != row['extraction_id']
+        if (result.guard_version != GUARD_VERSION or result.notice_id != notice.notice_id or result.extraction_id != row['extraction_id']
             or result.candidate != original or result.evidence != notice.evidence
             or result.candidate.topics != notice.topics or result.candidate.notice_type != notice.notice_type):
             raise ValueError('Analysis identity changed')
@@ -166,14 +187,35 @@ class SarvamService:
         with self.store.connect(write=True) as con:
             con.execute("UPDATE v2_ai_budget SET limit_paise=? WHERE id=1", (limit_paise,))
 
+    def record_credit_balance(self, balance_hundredths):
+        if type(balance_hundredths)!=int or not 0<=balance_hundredths<=999999999:
+            raise ValueError('Credits require a nonnegative exact amount')
+        with self.store.connect(write=True) as con:
+            # Outstanding admitted calls may not yet appear on the dashboard.
+            if con.execute("SELECT 1 FROM v2_ai_calls WHERE status='RESERVED'").fetchone():
+                raise ServiceError(409,'SARVAM_CALL_PENDING','Wait for admitted calls to finish before refreshing balance')
+            used=con.execute('SELECT coalesce(sum(reserved_paise),0) FROM v2_ai_calls').fetchone()[0]
+            con.execute('INSERT OR REPLACE INTO v2_credit_reserve VALUES (1,?,?,?,?,?)',(balance_hundredths,50000,used,self.credential_fingerprint,utc_text(self.clock())))
+        return self.health()
+
+    def _credit_safety(self,con,used,limit):
+        row=con.execute('SELECT * FROM v2_credit_reserve WHERE id=1').fetchone()
+        if row is None or row['credential_fingerprint']!=self.credential_fingerprint:return s.CreditSafety()
+        observed=datetime.fromisoformat(row['observed_at'].replace('Z','+00:00'))
+        until=observed+timedelta(minutes=15)
+        remaining=row['balance_hundredths']-max(0,used-row['baseline_reserved_paise'])
+        allowed=bool(self.api_key) and observed<=self.clock()<until and remaining-RESERVATION_PAISE>=row['floor_hundredths'] and used+RESERVATION_PAISE<=limit
+        return s.CreditSafety(floor_hundredths=row['floor_hundredths'],reported_balance_hundredths=row['balance_hundredths'],estimated_remaining_hundredths=remaining,reported_at=observed,valid_until=until,paid_requests_allowed=allowed)
+
     def health(self):
         with self.store.connect() as con:
             limit = con.execute("SELECT limit_paise FROM v2_ai_budget WHERE id=1").fetchone()[0]
             stats = con.execute("SELECT count(*),coalesce(sum(reserved_paise),0),coalesce(sum(prompt_tokens),0),coalesce(sum(completion_tokens),0) FROM v2_ai_calls").fetchone()
             last = con.execute("SELECT * FROM v2_ai_calls WHERE credential_fingerprint=? ORDER BY rowid DESC LIMIT 1", (self.credential_fingerprint,)).fetchone()
+            credit_safety=self._credit_safety(con,stats[1],limit)
             success = con.execute("SELECT max(finished_at) FROM v2_ai_calls WHERE credential_fingerprint=? AND status='SUCCESS'", (self.credential_fingerprint,)).fetchone()[0]
         status = "NOT_CONFIGURED" if not self.api_key else "NOT_TESTED" if last is None else "LIVE_OK" if last['status'] == 'SUCCESS' else 'ERROR'
-        return s.SarvamHealth(status=status, budget_limit_paise=limit, reserved_paise=stats[1], requests=stats[0], prompt_tokens=stats[2], completion_tokens=stats[3], last_success_at=success, last_error_code=last['error_code'] if last else None)
+        return s.SarvamHealth(status=status, credit_safety=credit_safety, budget_limit_paise=limit, reserved_paise=stats[1], requests=stats[0], prompt_tokens=stats[2], completion_tokens=stats[3], last_success_at=success, last_error_code=last['error_code'] if last else None)
 
     def _reserve(self, key):
         if not self.api_key: raise ServiceError(503, "SARVAM_NOT_CONFIGURED", "Configure SARVAM_API_KEY in the backend environment")
@@ -187,6 +229,8 @@ class SarvamService:
             used = con.execute("SELECT coalesce(sum(reserved_paise),0) FROM v2_ai_calls").fetchone()[0]
             if used + RESERVATION_PAISE > limit:
                 raise ServiceError(503, "SARVAM_BUDGET_EXCEEDED", "Local Sarvam test budget cannot admit another bounded request")
+            if not self._credit_safety(con,used,limit).paid_requests_allowed:
+                raise ServiceError(503,'SARVAM_CREDIT_RESERVE_PROTECTED','Paid processing paused: refresh the manual balance snapshot and preserve the 500-credit reserve')
             con.execute("INSERT INTO v2_ai_calls(id,cache_key,credential_fingerprint,started_at,status,reserved_paise) VALUES (?,?,?,?,?,?)", (call_id,key,self.credential_fingerprint,utc_text(self.clock()),"RESERVED",RESERVATION_PAISE))
         return call_id
 
@@ -243,7 +287,7 @@ class SarvamService:
             prior = con.execute("SELECT payload FROM v2_notice_analysis WHERE notice_id=?",(notice_id,)).fetchone()
             if prior:
                 old = s.NoticeAnalysis.model_validate_json(prior[0])
-                if old.input_sha256 == key and old.guard_version == GUARD_VERSION:
+                if old.input_sha256 == key and old.guard_version == GUARD_VERSION and old.rule_set_revision == self.store.rule_revision(con,notice.cycle_id):
                     if old.status == "VALIDATED": verified_analysis(con,row,notice)
                     old.cache_hit = True
                     return old
@@ -284,12 +328,34 @@ class SarvamService:
             current = s.DetectedNotice.model_validate_json(con.execute('SELECT payload FROM v2_notices WHERE id=?',(notice_id,)).fetchone()[0])
             if current.revision != expected_revision: raise ServiceError(409,'STALE_NOTICE_REVISION','Source changed during extraction; result cached without replacing the notice')
             if result.status=='VALIDATED':
+                from backend.services.rule_bridge import facts_to_notice_changes
+                before_rules, _ = self.store.rule_set_for_cycle(con, notice.cycle_id)
+                n_changes, rule_diags = facts_to_notice_changes(
+                    notice_id=notice_id,
+                    cycle_id=notice.cycle_id,
+                    facts=result.candidate.facts,
+                    evidence_anchors=result.evidence,
+                    published_on=notice.published_on,
+                    observed_on=notice.first_seen_at.astimezone(timezone(timedelta(hours=5,minutes=30))).date(),
+                    before_rules=before_rules,
+                )
+                result.rule_set_revision = self.store.rule_revision(con,notice.cycle_id)
+                result.notice_changes = n_changes
+                result.diagnostics.extend(rule_diags)
                 current.topics = result.candidate.topics
                 current.notice_type = result.candidate.notice_type
                 current.evidence = result.evidence
-                current.requires_rule_validation = (current.requires_rule_validation or result.candidate.requires_rule_validation or any(f.kind in {'RULE_CANDIDATE','UNSUPPORTED_REQUIREMENT'} for f in result.candidate.facts) or bool(re.search(RULE_WORDS,'\n'.join(pages),re.I)))
+                current.requires_rule_validation = (
+                    requires_rule_review(current.title)
+                    or result.candidate.requires_rule_validation
+                    or any(f.kind in {'RULE_CANDIDATE','UNSUPPORTED_REQUIREMENT'} for f in result.candidate.facts)
+                    or bool(n_changes)
+                    or requires_rule_review('\n'.join(pages))
+                )
                 if current.source_kind != s.SourceKind.LOCAL_DEMO_FIXTURE: current.processing_mode='SARVAM_105B'
-                current.diagnostics = list(dict.fromkeys(current.diagnostics + result.diagnostics))
+                previous_diags=set(old.diagnostics) if prior else set()
+                retained=[line for line in current.diagnostics if line not in previous_diags and line!='Rule validation is required before publication']
+                current.diagnostics = list(dict.fromkeys(retained + result.diagnostics + (['Rule validation is required before publication'] if current.requires_rule_validation else [])))
                 current.revision += 1
                 con.execute('UPDATE v2_notices SET payload=? WHERE id=?',(current.model_dump_json(),notice_id))
             con.execute('INSERT OR REPLACE INTO v2_notice_analysis VALUES (?,?)',(notice_id,result.model_dump_json()))

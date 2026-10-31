@@ -1,8 +1,9 @@
-> **Implementation update:** NTA JEE Main and UPSC active-exam adapters have now
-> completed actual native checks and are enabled in the local runtime database.
-> Checked-in defaults remain disabled. See `SOURCE_VERIFICATION.md` for proof and
-> boundaries. The GATE URL below is a kit-supplied candidate that did not verify
-> successfully in this run; do not treat it as active or confirmed coverage.
+> **Implementation update, 31 October 2026:** NTA JEE Main, UPSC active exams
+> and NTA NEET UG adapters have completed actual native checks and are enabled in
+> the local database. NEET's observed notices map to 2026 post-exam coverage, distinct
+> from 2027. Checked-in defaults remain disabled. See PHASES_1_3_REPORT.md and
+> SOURCE_VERIFICATION.md for evidence and limits. The GATE URL below is an
+> unverified candidate; it is not active or confirmed coverage.
 
 # Exam coverage and official-source registry — research snapshot
 

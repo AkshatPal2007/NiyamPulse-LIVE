@@ -1,0 +1,47 @@
+# REVIEW ONLY: this uses a PAID compute plan and persistent disk.
+# Nothing is provisioned by keeping this example in the repository.
+# Select this Blueprint path explicitly only after accepting Render's charges.
+services:
+  - type: web
+    name: niyampulse
+    runtime: python
+    plan: 0.5c-512mb
+    numInstances: 1
+    autoDeployTrigger: 'off'
+    buildCommand: pip install -r requirements-production.lock.txt && python -m scripts.build_release
+    startCommand: python -m backend.serve
+    healthCheckPath: /api/v2/health/ready
+    maxShutdownDelaySeconds: 90
+    disk:
+      name: niyampulse-state
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_VERSION
+        value: '24'
+      - key: NIYAMPULSE_ENV
+        value: production
+      - key: NIYAMPULSE_DATA_DIR
+        value: /var/data/niyampulse
+      - key: NIYAMPULSE_PERSISTENT_ROOT
+        value: /var/data
+      - key: NIYAMPULSE_STORAGE_DURABLE
+        value: '1'
+      - key: NIYAMPULSE_V2_DEMO
+        value: '0'
+      - key: NIYAMPULSE_WEB_MONITOR
+        value: '1'
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: '587'
+      - key: SMTP_SECURITY
+        value: starttls
+      - key: SMTP_USERNAME
+        sync: false
+      - key: SMTP_FROM
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SARVAM_API_KEY
+        sync: false

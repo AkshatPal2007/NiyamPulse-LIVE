@@ -1,0 +1,11 @@
+CREATE TABLE IF NOT EXISTS v2_rule_heads(cycle_id TEXT PRIMARY KEY REFERENCES v2_cycles(id), revision INTEGER NOT NULL, sha256 TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS v2_rule_history(cycle_id TEXT NOT NULL, revision INTEGER NOT NULL, update_id TEXT NOT NULL UNIQUE REFERENCES v2_updates(id), rules TEXT NOT NULL, verified_hashes TEXT NOT NULL, sha256 TEXT NOT NULL, applied_at TEXT NOT NULL, PRIMARY KEY(cycle_id,revision));
+CREATE TRIGGER IF NOT EXISTS v2_rule_history_update BEFORE UPDATE ON v2_rule_history BEGIN SELECT RAISE(ABORT,'immutable rule snapshot'); END;
+CREATE TRIGGER IF NOT EXISTS v2_rule_history_delete BEFORE DELETE ON v2_rule_history BEGIN SELECT RAISE(ABORT,'immutable rule snapshot'); END;
+CREATE TABLE IF NOT EXISTS v2_processing_jobs(notice_id TEXT PRIMARY KEY REFERENCES v2_notices(id), status TEXT NOT NULL, attempts INTEGER NOT NULL DEFAULT 0, next_attempt_at TEXT NOT NULL, lease_until TEXT, last_error TEXT, updated_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS v2_source_cursors(source_id TEXT PRIMARY KEY, position INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS v2_credit_reserve(id INTEGER PRIMARY KEY CHECK(id=1), balance_hundredths INTEGER NOT NULL, floor_hundredths INTEGER NOT NULL, baseline_reserved_paise INTEGER NOT NULL, credential_fingerprint TEXT NOT NULL, observed_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS v2_processing_leases(notice_id TEXT PRIMARY KEY REFERENCES v2_processing_jobs(notice_id), token TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS v2_attachment_lineage(notice_id TEXT PRIMARY KEY REFERENCES v2_notices(id), parent_snapshot_id TEXT NOT NULL REFERENCES v2_snapshots(id), parent_url TEXT NOT NULL, parent_title TEXT NOT NULL);
+CREATE TRIGGER IF NOT EXISTS v2_attachment_lineage_immutable BEFORE UPDATE ON v2_attachment_lineage BEGIN SELECT RAISE(ABORT,'immutable attachment lineage'); END;
+CREATE TABLE IF NOT EXISTS v2_source_leases(source_id TEXT PRIMARY KEY, token TEXT NOT NULL, lease_until TEXT NOT NULL);

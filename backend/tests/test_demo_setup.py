@@ -21,7 +21,7 @@ class DemoSetupTests(unittest.TestCase):
         self.assertEqual(store.state(workspace).documents, [])
         base = f"/api/v1/workspaces/{workspace}"
         from datetime import datetime, timezone
-        with TestClient(create_app(store, clock=lambda:datetime(2026,10,30,10,tzinfo=timezone.utc))) as client:
+        with TestClient(create_app(store, legacy_api_test=True, clock=lambda:datetime(2026,10,30,10,tzinfo=timezone.utc))) as client:
             original = client.post(base + "/documents", files={"file":("original.pdf",fixtures["synthetic_original.pdf"],"application/pdf")},data={"kind":"ORIGINAL"}).json()
             result = client.post(base + f"/documents/{original['document']['document_id']}/review",json=dict(expected_workspace_revision=0,reviewed_by="test_operator",confirm_source_review=True))
             self.assertEqual(result.status_code,200,result.text)

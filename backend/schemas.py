@@ -16,7 +16,7 @@ from enum import Enum
 from typing import Annotated, Literal
 
 from pydantic import (
-    AwareDatetime, BaseModel, ConfigDict, Field, HttpUrl,
+    AwareDatetime, BaseModel, ConfigDict, Field, HttpUrl, EmailStr, SecretStr,
     field_validator, model_validator,
 )
 
@@ -384,7 +384,7 @@ class InAppNotification(StrictModel):
     read_at: AwareDatetime | None = None
     official_source_url: HttpUrl | None = None
     evidence: list[EvidenceAnchor] = Field(min_length=1)
-    disclaimer: Literal["Decision support only; not official eligibility or application confirmation."] = DISCLAIMER
+    disclaimer: Literal["Decision support only; not official approval.", "Decision support only; not official eligibility or application confirmation."] = DISCLAIMER
 
     @model_validator(mode="after")
     def delivery_timestamps(self) -> "InAppNotification":
@@ -499,6 +499,7 @@ class SourceHealth(StrictModel):
     last_error: str | None = None
     last_http_status: int | None = None
     last_new_notices: int = Field(default=0, ge=0)
+    pending_extractions: int = Field(default=0, ge=0)
     total_notices: int = Field(default=0, ge=0)
     robots_status: str | None = None
     next_due_at: AwareDatetime | None = None
@@ -525,6 +526,7 @@ class MonitorCheckResult(StrictModel):
     discovered_links: int = Field(default=0, ge=0)
     created_notices: int = Field(default=0, ge=0)
     duplicates: int = Field(default=0, ge=0)
+    pending_extractions: int = Field(default=0, ge=0)
     unmapped: list[str] = Field(default_factory=list)
     errors: list[str] = Field(default_factory=list)
 
@@ -568,7 +570,23 @@ class NoticeAnalysis(StrictModel):
     summary_hi: str | None = Field(default=None, max_length=2500)
     summary_method: Literal["EXTRACTIVE_EN_CONTROLLED_HI"] = "EXTRACTIVE_EN_CONTROLLED_HI"
     evidence: list[EvidenceAnchor] = Field(default_factory=list)
+    notice_changes: list[NoticeChange] = Field(default_factory=list)
+    rule_set_revision: int = Field(default=0, ge=0)
     diagnostics: list[str] = Field(default_factory=list)
+
+
+class CreditBalanceReport(StrictModel):
+    credits: str = Field(pattern=r"^\d{1,7}(?:\.\d{1,2})?$")
+
+
+class CreditSafety(StrictModel):
+    floor_hundredths: int = 50000
+    reported_balance_hundredths: int | None = None
+    estimated_remaining_hundredths: int | None = None
+    reported_at: AwareDatetime | None = None
+    valid_until: AwareDatetime | None = None
+    paid_requests_allowed: bool = False
+    note: str = "Manual organisation balance snapshot; not a live provider balance. Other keys/products share these credits. Expires after 15 minutes."
 
 
 class SarvamHealth(StrictModel):
@@ -582,6 +600,7 @@ class SarvamHealth(StrictModel):
     last_success_at: AwareDatetime | None = None
     last_error_code: str | None = None
     budget_note: str = "Conservative local reservations, not provider-billed spend."
+    credit_safety: CreditSafety = Field(default_factory=CreditSafety)
 
 
 class OcrResult(StrictModel):
@@ -592,6 +611,22 @@ class OcrResult(StrictModel):
     pages: int = Field(ge=0)
     extraction_id: Id | None = None
     provider: Literal["SARVAM_VISION"] = "SARVAM_VISION"
+
+
+class ProcessingJob(StrictModel):
+    notice_id: Id
+    status: Literal['QUEUED','LEASED','RETRY','PAUSED','REVIEW_READY','HELD','COMPLETE']
+    attempts: int = Field(ge=0)
+    next_attempt_at: AwareDatetime
+    lease_until: AwareDatetime | None = None
+    last_error: str | None = None
+    updated_at: AwareDatetime
+
+
+class ProcessingQueue(StrictModel):
+    jobs: list[ProcessingJob] = Field(default_factory=list)
+    counts: dict[str,int] = Field(default_factory=dict)
+    worker_active: bool = False
 
 
 class NoticeDetail(StrictModel):
@@ -615,6 +650,108 @@ class PlatformStatus(StrictModel):
     demo_mode: bool
     sarvam_status: Literal["NOT_CONFIGURED", "NOT_TESTED", "LIVE_OK", "ERROR"]
     disclaimer: str = DISCLAIMER
+
+
+class RegisterRequest(StrictModel):
+    email: EmailStr
+    display_name: str | None = Field(default=None, min_length=1, max_length=80)
+    adult_confirmed: bool
+
+    @field_validator('adult_confirmed', mode='before')
+    @classmethod
+    def adult_registration(cls, value):
+        if type(value) is not bool or not value:
+            raise ValueError('Registration requires an adult account holder; guardians can follow exams without storing child details')
+        return value
+
+
+class PasswordRequestModel(StrictModel):
+    # Passwords are opaque secrets. The general DTO whitespace normalization
+    # must not silently change a password chosen by its owner.
+    model_config = ConfigDict(extra='forbid',validate_assignment=True,str_strip_whitespace=False)
+
+
+class LoginRequest(PasswordRequestModel):
+    email: EmailStr
+    password: SecretStr = Field(min_length=1, max_length=128)
+
+
+class EmailRequest(StrictModel):
+    email: EmailStr
+
+
+class CompleteAccountRequest(PasswordRequestModel):
+    token: SecretStr = Field(min_length=32, max_length=128)
+    password: SecretStr = Field(min_length=15, max_length=128)
+
+
+class PasswordChangeRequest(PasswordRequestModel):
+    current_password: SecretStr = Field(min_length=1, max_length=128)
+    new_password: SecretStr = Field(min_length=15, max_length=128)
+
+
+class AccountDeletionRequest(PasswordRequestModel):
+    password: SecretStr = Field(min_length=1, max_length=128)
+
+
+class AuthConfig(StrictModel):
+    registration_available: bool
+    email_delivery_configured: bool
+    deployment_mode: Literal['local','production']
+    adult_accounts_only: bool = True
+
+
+class ServiceHealth(StrictModel):
+    schema_version: Literal['2.0.0'] = SCHEMA_VERSION
+    status: Literal['OK', 'NOT_READY']
+    checks: dict[str, bool]
+    monitoring_enabled: bool
+
+
+class EmailActionResponse(StrictModel):
+    status: Literal['REQUEST_ACCEPTED'] = 'REQUEST_ACCEPTED'
+    message: str = 'If the address can receive this request, check its inbox. Delivery may take a few minutes.'
+
+
+class AuthSession(StrictModel):
+    user_id: Id
+    email: EmailStr
+    display_name: str
+    role: Literal['USER','ADMIN']
+    email_verified: bool
+    expires_at: AwareDatetime
+    csrf_token: str
+
+
+class PublicUpdate(StrictModel):
+    update_id: Id
+    notice_id: Id
+    cycle_id: Id
+    title: str
+    notice_type: NoticeType
+    topics: list[Topic]
+    publisher: str
+    source_url: HttpUrl
+    published_at: AwareDatetime
+    first_seen_at: AwareDatetime
+    source_published_on: date | None = None
+    summary_en: str
+    summary_hi: str | None = None
+    evidence: list[EvidenceAnchor]
+
+
+class PublicUpdatesResponse(StrictModel):
+    updates: list[PublicUpdate] = Field(default_factory=list)
+    total: int = Field(ge=0)
+
+
+class PublicSource(StrictModel):
+    source_id: Id
+    publisher: str
+    listing_url: HttpUrl
+    enabled: bool
+    last_success_at: AwareDatetime | None = None
+    status: Literal['LIVE_MONITORED','SOURCE_CONFIGURED','UNAVAILABLE','CATALOG_ONLY']
 
 
 # Gradual migration: the legacy names remain importable for code that already

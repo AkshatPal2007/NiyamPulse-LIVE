@@ -34,5 +34,29 @@
     "sha256": "b60af571b16112e41528796c46d70ea9280b2a6b2b2746127bf8add805ae7c98",
     "bytes": 208,
     "fetched_at": "2026-10-30T17:22:15.288358+00:00"
+  },
+  "neet-listing": {
+    "url": "https://neet.nta.nic.in/public-notices/",
+    "final_url": "https://neet.nta.nic.in/public-notices/",
+    "sha256": "5191b1000915664386278fb67ee9e23e79a24e429b801a15971261e3443c51c8",
+    "captured_at": "2026-10-30T21:05:44.748335+00:00",
+    "content_type": "text/html",
+    "status": 200
+  },
+  "neet-robots": {
+    "url": "https://neet.nta.nic.in/robots.txt",
+    "final_url": "https://neet.nta.nic.in/robots.txt",
+    "sha256": "9311bab30d8b5d05f5fa5563a251b8c96b8470873bb77c62d3d17c146d7acab7",
+    "captured_at": "2026-10-30T21:05:44.748335+00:00",
+    "content_type": "text/plain",
+    "status": 200
+  },
+  "upsc-ese-2027": {
+    "url": "https://www.upsc.gov.in/examinations/Engineering%20Services%20%28Preliminary%29%20Examination%2C%202027",
+    "final_url": "https://www.upsc.gov.in/examinations/Engineering%20Services%20%28Preliminary%29%20Examination%2C%202027",
+    "sha256": "bb3dcce27cfcb8f8925913ab719d006eb24b87a959035fd6fa09d7f75aa5d76f",
+    "captured_at": "2026-10-30T17:36:57.103052Z",
+    "content_type": "text/html",
+    "status": 200
   }
 }

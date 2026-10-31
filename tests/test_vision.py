@@ -26,7 +26,7 @@ def test_ocr_preserves_original_and_reuses_job_and_extraction(client):
         base={'job_id':'test-job','status':'completed','usage':{'pages_total':1,'pages_processed':1,'pages_succeeded':1,'pages_failed':0}}
         if request.url.path.endswith('/status'):return httpx.Response(200,json=base|{'created_at':'2026-10-31T00:00:00Z','updated_at':'2026-10-31T00:00:01Z'})
         return httpx.Response(200,json=base|{'type':'parse','documents':[{'file_name':'notice.pdf','pages':[{'page_number':1,'content':'JEE Main 2027 registration notice.\nRecovered exact page.'}]}]})
-    ai=SarvamService(client.app.state.exam_store,api_key='test-key');ai.set_budget(500)
+    ai=SarvamService(client.app.state.exam_store,api_key='test-key');ai.set_budget(500);ai.record_credit_balance(59812)
     client.app.state.sarvam_service=ai
     client.app.state.vision_service=VisionService(ai,transport=httpx.MockTransport(handler),poll_seconds=0)
     admin,_=session(client,'operator');learner,_=session(client,'school')
@@ -50,7 +50,7 @@ def test_incomplete_and_duplicate_ocr_pages_are_rejected():
 
 def test_ocr_access_denial_preserves_notice_and_reservation(client):
     notice=pdf_notice(client)
-    ai=SarvamService(client.app.state.exam_store,api_key='test-key');ai.set_budget(500)
+    ai=SarvamService(client.app.state.exam_store,api_key='test-key');ai.set_budget(500);ai.record_credit_balance(59812)
     vision=VisionService(ai,transport=httpx.MockTransport(lambda _:httpx.Response(403,json={'error':'denied'})))
     with pytest.raises(ServiceError) as error:vision.process(notice.notice_id,0)
     assert error.value.code=='OCR_ACCESS_DENIED'

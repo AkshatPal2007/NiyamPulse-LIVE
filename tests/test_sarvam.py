@@ -22,7 +22,7 @@ def setup_service(client, payload=None, status=200):
         calls.append(request)
         return httpx.Response(status,json={'choices':[{'finish_reason':'stop','message':{'content':json.dumps(payload or candidate())}}], 'usage':{'prompt_tokens':100,'completion_tokens':80,'total_tokens':180}})
     svc=SarvamService(store,api_key='test-key',transport=httpx.MockTransport(handler))
-    svc.set_budget(5000)
+    svc.set_budget(5000);svc.record_credit_balance(59812)
     client.app.state.sarvam_service=svc
     return svc,notice,calls
 
@@ -107,6 +107,19 @@ def test_whitespace_only_quote_is_resolved_to_exact_frozen_span(client):
     assert svc.process(notice.notice_id,1).cache_hit
 
 
+def test_known_announcement_label_binds_exact_source_separator(client):
+    svc,notice,calls=setup_service(client)
+    from backend.services.source_monitor import FetchResult,ListingLink
+    text='Date of Examination\n20,21,22,23,24 and 28 January 2027'
+    notice,_=SourceMonitor(svc.store).ingest(None,ListingLink('JEE registration','https://demo.invalid/punct','jee-main:2027:s1'),FetchResult('https://demo.invalid/punct','https://demo.invalid/punct',text.encode(),'text/plain',200),offline=True)
+    item=candidate('Date of Examination: 20,21,22,23,24 and 28 January 2027');item['topics']=['EXAM_SCHEDULE']
+    def response(_):return httpx.Response(200,json={'choices':[{'finish_reason':'stop','message':{'content':json.dumps(item)}}]})
+    svc.transport=httpx.MockTransport(response)
+    result=svc.process(notice.notice_id,0)
+    assert result.status=='VALIDATED' and result.evidence[0].literal_quote==text
+    assert svc.process(notice.notice_id,1).cache_hit
+
+
 def test_localized_publication_and_mutated_summary_rejected(client):
     svc,notice,calls=setup_service(client)
     learner,_=session(client,'school');admin,operator=session(client,'operator')
@@ -146,3 +159,85 @@ def test_malformed_provider_json_shape_returns_typed_failure_and_records_reserva
     with pytest.raises(ServiceError) as error:svc.process(notice.notice_id,0)
     assert error.value.code=='SARVAM_INVALID_RESPONSE'
     assert svc.health().reserved_paise==500 and svc.health().status=='ERROR'
+
+
+def test_sarvam_extracts_rule_candidate_and_enforces_bridge(client):
+    from backend.services.source_monitor import FetchResult, ListingLink, SourceMonitor
+    store = client.app.state.exam_store
+    text = "SYNTHETIC DEMO. Published: 2026-01-01 | Effective: 2026-01-01 | Scheme: jee-main:2027:s1 | Operation: ADD | Scope: all_applicants | Minimum qualifying marks: 75%."
+    url = "https://demo.invalid/rule-marks-test"
+    doc = FetchResult(url, url, text.encode(), "text/plain", 200)
+    notice, _ = SourceMonitor(store).ingest(None, ListingLink("Rule Notice", url, "jee-main:2027:s1"), doc, offline=True)
+
+    cand = {
+        'cycle_id': notice.cycle_id,
+        'notice_type': 'CORRIGENDUM',
+        'topics': ['ELIGIBILITY'],
+        'facts': [{'kind': 'RULE_CANDIDATE', 'page_number': 1, 'literal_quote': 'Published: 2026-01-01 | Effective: 2026-01-01 | Scheme: jee-main:2027:s1 | Operation: ADD | Scope: all_applicants | Minimum qualifying marks: 75%.', 'date_value': None}],
+        'requires_rule_validation': True,
+    }
+    calls = []
+    def handler(request):
+        calls.append(request)
+        return httpx.Response(200, json={'choices': [{'finish_reason': 'stop', 'message': {'content': json.dumps(cand)}}], 'usage': {'prompt_tokens': 120, 'completion_tokens': 60, 'total_tokens': 180}})
+    svc = SarvamService(store, api_key='test-key', transport=httpx.MockTransport(handler))
+    svc.set_budget(5000);svc.record_credit_balance(59812)
+    client.app.state.sarvam_service = svc
+
+    learner, _ = session(client, 'school')
+    client.post('/api/v2/me/subscriptions', headers=learner, json={'cycle_id': notice.cycle_id})
+    client.patch('/api/v2/me/profile', headers=learner, json={'personalization_opt_in': True, 'marks_percent': 80.0})
+
+    result = svc.process(notice.notice_id, 0)
+    assert result.status == 'VALIDATED'
+    assert len(result.notice_changes) == 1
+    assert result.notice_changes[0].rule_type == s.RuleChangeType.MINIMUM_MARKS
+    assert result.notice_changes[0].proposed_rule.min_marks_percent == 75.0
+
+    # Notice is flagged for rule validation
+    updated = client.app.state.exam_service.notice_detail(notice.notice_id)
+    assert updated.notice.requires_rule_validation is True
+    assert updated.notice.revision == 1
+
+    # Operator approves notice; bridge executes and fanout delivers impact
+    admin, operator = session(client, 'operator')
+    body = {
+        'notice_id': notice.notice_id,
+        'reviewer_id': operator['user_id'],
+        'action': 'APPROVE',
+        'reason': 'Approved validated rule amendment',
+        'reviewed_at': datetime.now(timezone.utc).isoformat(),
+        'expected_revision': 1,
+    }
+    resp = client.post('/api/v2/admin/notices/' + notice.notice_id + '/review', headers=admin, json=body)
+    assert resp.status_code == 200
+
+    notifs = client.get('/api/v2/me/notifications', headers=learner).json()['notifications']
+    assert len(notifs) >= 1
+    # Check that rule set is persisted
+    with store.connect() as con:
+        rules, _ = store.rule_set_for_cycle(con, notice.cycle_id)
+        assert any(r.min_marks_percent == 75.0 for r in rules)
+
+
+def test_rule_validation_required_blocks_when_no_changes(client):
+    store = client.app.state.exam_store
+    notice = SourceMonitor(store).replay_demo()[0]
+    # Mark notice as requiring rule validation without any valid notice changes
+    with store.connect(write=True) as con:
+        cur = s.DetectedNotice.model_validate_json(con.execute("SELECT payload FROM v2_notices WHERE id=?", (notice.notice_id,)).fetchone()[0])
+        cur.requires_rule_validation = True
+        con.execute("UPDATE v2_notices SET payload=? WHERE id=?", (cur.model_dump_json(), notice.notice_id))
+
+    admin, operator = session(client, 'operator')
+    body = {
+        'notice_id': notice.notice_id,
+        'reviewer_id': operator['user_id'],
+        'action': 'APPROVE',
+        'reason': 'Attempt to approve without rule bridge changes',
+        'reviewed_at': datetime.now(timezone.utc).isoformat(),
+        'expected_revision': 0,
+    }
+    resp = client.post('/api/v2/admin/notices/' + notice.notice_id + '/review', headers=admin, json=body)
+    assert resp.status_code == 409
+    assert resp.json()['code'] == 'RULE_VALIDATION_REQUIRED'

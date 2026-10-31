@@ -1,6 +1,6 @@
 {
   "schema_version": "2.0.0",
-  "description": "Initial source candidates from the migration kit. Only NTA JEE Main and UPSC active adapters have completed independent native checks; checked-in defaults remain disabled.",
+  "description": "Individually tested NTA JEE, NTA NEET and UPSC adapters; checked-in defaults remain disabled until actual runtime verification.",
   "sources": [
     {
       "source_id": "nta-jee-main",
@@ -23,13 +23,14 @@
       "source_kind": "OFFICIAL_WEB_LISTING",
       "listing_url": "https://neet.nta.nic.in/public-notices/",
       "allowed_hosts": [
-        "neet.nta.nic.in"
+        "neet.nta.nic.in",
+        "cdnbbsr.s3waas.gov.in"
       ],
       "readiness": "LISTING_VERIFIED_ADAPTER_UNTESTED",
       "adapter_name": null,
       "enabled": false,
       "poll_interval_minutes": 60,
-      "notes": "NEET UG notices; validate year and notice type, do not infer eligibility from notice title"
+      "notes": "Official public notices and observed S3WaaS PDF host. Exact year routing; identifying topper lists excluded. Post-exam 2026 notices are distinct from 2027."
     },
     {
       "source_id": "upsc-active",

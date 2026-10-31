@@ -59,7 +59,7 @@ Use `SourceKind.LOCAL_DEMO_FIXTURE` for demo playback, and show `SYNTHETIC DEMO`
 | POST | `/api/v2/admin/monitor/{source_id}/check` | `dry_run=true` (default) | `MonitorCheckResult` (to be designed before implementation) | admin |
 | GET | `/api/v2/admin/updates/{update_id}/recipients` | `cursor?` | `RecipientMatch[]`, privacy-restricted | admin |
 
-**Implementation status:** all phase-1 subscription/profile/inbox/admin endpoints above are implemented in this repository. The monitor check response is now defined below. The original supplied kit was contract-only; this is the merged implementation contract. Personalized v2 rule-change publication remains unimplemented. The Sarvam text/OCR increment is specified in section 12.
+**Implementation status:** all phase-1 subscription/profile/inbox/admin endpoints above are implemented in this repository. The monitor check response is now defined below. The original supplied kit was contract-only; this is the merged implementation contract. Evidence-backed personalized v2 rule-change publication is implemented for the five closed rule types; section 13 records its supported scope and conservative review holds. The Sarvam text/OCR increment is specified in section 12.
 
 ## 5. Example payloads (SYNTHETIC; illustrate shape, not real alerts)
 
@@ -350,3 +350,152 @@ Controlled Hindi templates additionally recognize a closed set of exact source l
 (notification date, examination commencement, application receipt deadline, upload
 date), copying the original value/format verbatim. They do not infer an ISO rule,
 calendar interpretation or timezone from ambiguous numeric dates.
+
+
+## 13. Future-plan phases 1–3 contract update (additive v2.0.0)
+
+NoticeAnalysis adds `notice_changes: NoticeChange[]` and `rule_set_revision: int`
+(default zero). These are server-derived proposals, never model authority. The
+supported rule subset requires literal explicit Published/Effective/Scheme/
+Operation/(Target for REPLACE/REVOKE)/Scope context and a closed EN/HI condition.
+Missing/ambiguous scope, targets, dates or unsupported mixed batches stay held.
+No fallback to today, first-same-type targets or document-name substitution exists.
+New stable IDs derive from source notice/context. Publication recomputes proposals
+from immutable source facts and independently verified lineage, checks the cycle
+revision, then supplies explicit attestations to the unchanged v1 planner.
+
+Migration 005 appends immutable full rule-history snapshots and maintains a
+cycle revision/hash head. Closed/revoked intervals are retained in each complete
+snapshot, so loading after restart reproduces the planned rule hash and decisions.
+Draft migration-004-only rule data requires review rather than guessed conversion.
+Schema version remains 2.0.0 for these additive fields; v1 contracts stay 1.1.0.
+
+`POST /api/v2/admin/sarvam/credit-balance` (operator only) accepts
+`{credits: "598.12"}` from a freshly refreshed dashboard. SarvamHealth adds
+`credit_safety` with fixed 50000-hundredth floor, reported/estimated balances,
+report/expiry timestamps and `paid_requests_allowed`. Missing, stale, wrong-key,
+insufficient-balance snapshots block new paid operations atomically. The existing
+5000-paise lifetime local reservation cap remains independent. Successful/failed/
+uncertain reservations are retained. Cached processing remains available. This is
+an explicitly manual organisation-balance observation, not a live balance API.
+Shared spending by other products/keys cannot be measured by this local ledger.
+
+MonitorCheckResult and SourceHealth add `pending_extractions` (default zero).
+Listing fetch success and deferred OCR are separate states; adapter enablement
+requires at least one usable mapped extraction and no fetch/structure errors.
+Blank PDFs remain held with no publication path until OCR/evidence verification.
+
+`GET /api/v2/admin/processing` returns persisted ProcessingQueue jobs/counts and
+freshness-based worker_active. `POST /api/v2/admin/processing/{notice_id}/retry`
+queues an operator retry within the three-attempt limit. Queue states are QUEUED,
+LEASED, RETRY, PAUSED, REVIEW_READY, HELD, COMPLETE. Five-minute leases use unique
+ownership tokens. Lost leases/uncertain paid submissions pause for reconciliation.
+Rate-limit/conflict retries are bounded; missing credits/budget pause admission.
+Workers never approve a notice or send notifications. Root lists rotate in batches
+of five, UPSC PDF attachments in batches of two per detail page. Attachments require
+an immutable root-listing → exam-detail → observed-PDF lineage, verified at review.
+
+User-facing v2 disclaimer default is `Decision support only; not official approval.`
+The retained v1 intake still limits PDFs to 20 pages. Official v2 PDF extraction
+accepts at most 100 readable pages / 2 MiB embedded text under the existing 10 MiB
+HTTP bound, so the observed 62-page UPSC bulletin can be preserved and cited.
+105B remains limited to six pages / 30 KiB; partial coverage is shown and never
+makes unsupported rules operative. Speech and exact coordinate highlights are
+not implemented in these phases.
+
+InAppNotification also accepts the earlier v2 disclaimer literal when loading
+saved alerts. Historical notification payloads are preserved without rewriting.
+
+
+## Real-account release (additive contracts; cookie authentication)
+
+Default runtime no longer creates demo users or exposes role switching. Test-only
+DemoSessionRequest remains available only under explicit local demo mode; production
+mode refuses to enable it. Existing v1 code is preserved; its private operations
+now require an authenticated administrator and CSRF protection in the real runtime.
+
+Public routes: GET /api/v2/auth/config (AuthConfig), GET /api/v2/updates
+(PublicUpdatesResponse, reviewed OFFICIAL_WEB_LISTING updates only), and
+GET /api/v2/sources (PublicSource[] with measured coverage/check timestamps).
+No subscriber identities, keys, processing internals or unreviewed summaries are public.
+
+Accounts:
+- POST /auth/register: RegisterRequest {email, display_name?, adult_confirmed:true}.
+  202 EmailActionResponse means REQUEST_ACCEPTED, never guaranteed delivery.
+- POST /auth/resend-verification and /auth/forgot-password: EmailRequest; generic 202.
+- POST /auth/verify and /auth/reset-password: CompleteAccountRequest {token,password}.
+  Tokens are purpose-bound, expiring and single-use; passwords are chosen only by
+  the mailbox holder, 15–128 characters, with spaces preserved. Returns AuthSession.
+- POST /auth/login: LoginRequest {email,password}; returns AuthSession.
+- GET /auth/session restores AuthSession; POST /auth/logout revokes it.
+- POST /auth/password: PasswordChangeRequest {current_password,new_password}; 204,
+  all sessions and unused action tokens revoked. DELETE /me/account requires
+  AccountDeletionRequest {password} for real learner accounts; administrator accounts
+  cannot be deleted through that learner endpoint.
+
+AuthSession exposes user_id, email, display_name, USER/ADMIN role, email_verified,
+expires_at and a CSRF token. It never exposes the authentication/session cookie value.
+Opaque session IDs and email tokens are hashed at rest; Argon2id hashes passwords.
+Session lifetime is eight hours with thirty-minute idle expiry. Secure production
+cookies use __Host-niyampulse, HttpOnly, Secure, SameSite=Lax, Path=/ and no Domain.
+Local HTTP uses niyampulse_session with HttpOnly and SameSite=Lax. Cross-origin unsafe
+requests are refused; cookie-authenticated mutations require X-CSRF-Token. Cookies
+and browser bearer tokens are not stored in localStorage. Real roles are assigned
+only by the trusted server CLI, not registration input or a UI selector.
+
+Production mode requires an HTTPS canonical NIYAMPULSE_PUBLIC_URL; local HTTP is
+limited to loopback. Mail uses configured SMTP with STARTTLS or implicit TLS; no
+placeholder sender/provider is used. Missing SMTP disables registration/recovery.
+Authenticated SMTP requires a complete username/password pair; an incomplete pair
+also leaves both AuthConfig availability flags false and registration/recovery at
+503. Explicit unauthenticated TLS relays are supported. Configured does not mean
+the provider has authenticated successfully or an email has reached its inbox.
+Email links carry action tokens in fragments, cleared from browser history before
+rendering. Request bodies for /auth are capped at 8 KiB, including chunked bodies;
+authentication/email requests use persisted rate limits. Security headers, host
+validation and no-store private responses are enabled.
+
+Initial account registration requires an adult holder's self-declaration; a guardian
+may follow exams without adding a child's details. This is not verified age or
+parental-consent verification. Direct child accounts and public deployment require
+separate policy/consent readiness; no child DOB is collected during account setup.
+
+New real subscriptions receive at most twenty reviewed informational updates from
+the last thirty days, filtered by cycle/topics, deduplicated by (update_id,user_id).
+Rule-update history is not replayed as a new personal before/after assessment.
+
+The production store is var/production/niyampulse.sqlite3. A one-time backed-up
+migration preserves genuine source snapshots, extractions, approved history and the
+entire Sarvam reservation/cache ledger. Synthetic accounts, subscriptions, inbox
+records, notices and v1 fixture workspaces are excluded. The old database remains
+an archive; no real users or default administrator passwords are fabricated.
+
+## Deployment and operational contract — 31 October 2026
+
+- New v2 notification defaults and visible v2 UI use the required disclaimer:
+  `Decision support only; not official eligibility or application confirmation.`
+  Existing v1 payloads and historical source/audit records remain unchanged.
+- Public `GET /api/v2/health/live` and `GET /api/v2/health/ready` return
+  `ServiceHealth {schema_version:"2.0.0",status:"OK"|"NOT_READY",checks:Record<string,boolean>,monitoring_enabled:boolean}`.
+  Readiness verifies the database/account migration, built frontend and required
+  worker threads. It returns HTTP 503 on failure; liveness returns 200. These
+  operational statuses are separate from deterministic applicant decision states.
+  No account identities, database paths, credentials or raw exceptions are returned.
+- API write bodies are bounded before parsing: 8 KiB for `/auth`, 256 KiB for
+  other JSON operations, and 10 MiB PDF plus 64 KiB multipart overhead on legacy
+  document uploads. Overflow returns HTTP 413 in the appropriate v1/v2 ApiError.
+- Unknown NIYAMPULSE_ENV values fail startup. Render/Vercel environments default
+  to production and refuse explicit local mode. Render can derive its canonical
+  HTTPS origin from RENDER_EXTERNAL_URL if NIYAMPULSE_PUBLIC_URL is unset.
+- Production runtime requires an explicit absolute data directory, a verified
+  durability declaration, complete SMTP configuration, and disabled demo flags.
+  On Render, the data path must be inside an actual persistent disk mount. The
+  SQLite/worker backend refuses Vercel serverless execution. Production API and
+  standalone worker share an OS-owned lock; use one runtime, not multiple workers.
+- Interactive API docs/OpenAPI HTTP routes are disabled in production; schema
+  generation through Python remains available. Hashed frontend assets are immutable
+  cached; HTML revalidates and API responses remain no-store.
+- Verified online backups include source evidence, accounts and the entire
+  financial/cache ledger. Restore verifies its SHA-256 manifest, requires a new
+  destination and revokes all sessions/action tokens. It never overwrites live data.
+  Operational preflight is a local check, not evidence of a hosted deployment.

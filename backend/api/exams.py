@@ -10,7 +10,9 @@ def service(request:Request): return request.app.state.exam_service
 
 
 def current_user(request:Request,authorization:str|None=Header(None)):
-    return service(request).identity(authorization)
+    if service(request).demo and authorization:return service(request).identity(authorization)
+    auth=request.app.state.auth_service
+    return auth.identity(request.cookies.get(auth.settings.cookie_name))
 
 
 def admin(user=Depends(current_user)):
@@ -23,9 +25,25 @@ def status(request:Request):
     return s.PlatformStatus(demo_mode=service(request).demo,sarvam_status=request.app.state.sarvam_service.health().status)
 
 
+@router.get('/updates',response_model=s.PublicUpdatesResponse)
+def public_updates(request:Request,cycle_id:str|None=None,limit:int=Query(30,ge=1,le=100)):
+    return service(request).public_updates(cycle_id,limit)
+
+
+@router.get('/sources',response_model=list[s.PublicSource])
+def public_sources(request:Request):
+    return service(request).public_sources()
+
+
 @router.get("/admin/sarvam",response_model=s.SarvamHealth)
 def sarvam_health(request:Request,user=Depends(admin)):
     return request.app.state.sarvam_service.health()
+
+
+@router.post('/admin/sarvam/credit-balance',response_model=s.SarvamHealth)
+def credit_balance(body:s.CreditBalanceReport,request:Request,user=Depends(admin)):
+    from decimal import Decimal
+    return request.app.state.sarvam_service.record_credit_balance(int(Decimal(body.credits)*100))
 
 
 @router.post("/admin/notices/{notice_id}/analyze",response_model=s.NoticeAnalysis)
@@ -88,8 +106,13 @@ def delete_personalization(request:Request,user=Depends(current_user)):
 
 
 @router.delete("/me/account",status_code=204)
-def delete_account(request:Request,user=Depends(current_user)):
+def delete_account(request:Request,body:s.AccountDeletionRequest|None=None,user=Depends(current_user)):
     if user["role"]!="USER": raise ServiceError(403,"USER_ACCOUNT_REQUIRED","Only learner accounts use this deletion endpoint")
+    if not service(request).demo:
+        if body is None:raise ServiceError(422,'PASSWORD_REQUIRED','Confirm your password before deleting this account')
+        auth=request.app.state.auth_service
+        auth._rate('delete-account',user['email'],request.client.host if request.client else 'unknown',limit=5)
+        auth.verify_password(user['id'],body.password.get_secret_value())
     service(request).delete_account(user["id"])
     return Response(status_code=204)
 
@@ -150,3 +173,13 @@ def replay(request:Request,user=Depends(admin)):
 @router.get("/admin/updates/{update_id}/recipients",response_model=list[s.RecipientMatch])
 def recipients(update_id:str,request:Request,user=Depends(admin)):
     return service(request).recipients(update_id)
+
+
+@router.get('/admin/processing',response_model=s.ProcessingQueue)
+def processing_queue(request:Request,user=Depends(admin)):
+    return request.app.state.processing_service.queue()
+
+
+@router.post('/admin/processing/{notice_id}/retry',response_model=s.ProcessingJob)
+def retry_processing(notice_id:str,request:Request,user=Depends(admin)):
+    return request.app.state.processing_service.retry(notice_id)

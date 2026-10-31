@@ -1,3 +1,8 @@
+> Historical first-integration record. Current phase-1–3 outcomes, the 500-credit
+> floor, three additional admitted operations and genuine human acceptance are in
+> [PHASES_1_3_REPORT.md](PHASES_1_3_REPORT.md). Current reservations are ₹50, so new
+> paid processing is paused. Do not treat earlier balances/manual holds as current.
+
 # Sarvam phase — observed verification, 31 October 2026 IST
 
 ## VERIFIED

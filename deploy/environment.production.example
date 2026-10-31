@@ -1,0 +1,19 @@
+# Copy values to the hosting platform's private environment, never commit secrets.
+NIYAMPULSE_ENV=production
+NIYAMPULSE_PUBLIC_URL=https://your-actual-service-domain
+NIYAMPULSE_DATA_DIR=/var/data/niyampulse
+NIYAMPULSE_PERSISTENT_ROOT=/var/data
+# Set only after the persistent disk is attached. This is an operator declaration.
+NIYAMPULSE_STORAGE_DURABLE=1
+NIYAMPULSE_V2_DEMO=0
+NIYAMPULSE_WEB_MONITOR=1
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_SECURITY=starttls
+SMTP_USERNAME=
+SMTP_FROM=
+SMTP_PASSWORD=
+SARVAM_API_KEY=
+# PORT is supplied by Render; native launch defaults to loopback port 8000.
+# Trust * proxy forwarding only on Render's isolated reverse-proxy path.
+# FORWARDED_ALLOW_IPS=*

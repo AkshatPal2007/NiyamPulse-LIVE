@@ -54,3 +54,15 @@ NTA: the configured listing and linked PDFs, mapped by explicit year/session.
 UPSC: the active-exam listing and mapped exam-detail HTML pages. Deep attachment
 content changes, archive pagination and broad all-exam coverage are not implemented.
 Each poll is capped at five mapped documents. Review is required for publication.
+
+
+## 31 October 2026 extension
+
+NTA NEET UG was independently fetched with robots allowed; its observed S3WaaS
+PDF host is now allowlisted. Ten notices route explicitly to NEET UG 2026
+post-exam coverage, distinct from 2027. Actual second-batch polling proved tail
+rotation. UPSC attachment ancestry was exercised against the actual 62-page ESE
+bulletin. Source facts, limits, costs, hashes and observed outcomes are recorded
+in [PHASES_1_3_REPORT.md](history/PHASES_1_3_REPORT.md); offline capture hashes are in
+`tests/fixtures/official/capture_manifest.json`. Config defaults remain disabled
+until a fresh runtime completes its own check. No cryptographic authenticity claim.

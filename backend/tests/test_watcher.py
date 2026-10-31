@@ -28,7 +28,7 @@ class WatcherTests(unittest.TestCase):
                                          evaluation_date=date(2026,10,30), profiles=[profile(marks_percent=65)],
                                          configured_hashes=[hashlib.sha256(original).hexdigest()], intake_directory=str(intake)))
         base = "/api/v1/workspaces/workspace-demo"
-        with TestClient(create_app(store, clock=lambda:datetime(2026,10,30,10,tzinfo=timezone.utc))) as client:
+        with TestClient(create_app(store, legacy_api_test=True, clock=lambda:datetime(2026,10,30,10,tzinfo=timezone.utc))) as client:
             imported = client.post(base + "/documents",files={"file":("original.pdf",original,"application/pdf")},data={"kind":"ORIGINAL"}).json()
             reviewed = client.post(base + f"/documents/{imported['document']['document_id']}/review", json=dict(expected_workspace_revision=0,reviewed_by="operator",confirm_source_review=True))
             self.assertEqual(reviewed.status_code,200,reviewed.text)

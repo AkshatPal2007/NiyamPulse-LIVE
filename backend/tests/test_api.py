@@ -27,7 +27,7 @@ class APIHarness(unittest.TestCase):
             configured_hashes=[hashlib.sha256(b).hexdigest() for b in (self.original, self.corrigendum)],
             profiles=[profile(marks_percent=65)],
         ))
-        self.client = TestClient(create_app(self.store, clock=lambda: datetime(2026, 10, 30, 10, tzinfo=timezone.utc)))
+        self.client = TestClient(create_app(self.store, legacy_api_test=True, clock=lambda: datetime(2026, 10, 30, 10, tzinfo=timezone.utc)))
         self.client.__enter__()
         self.addCleanup(self.client.__exit__, None, None, None)
         self.base = "/api/v1/workspaces/workspace-demo"

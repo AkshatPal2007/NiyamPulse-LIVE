@@ -2,6 +2,17 @@
 
 **Updated 2026-10-30. Target: native Windows, Python 3.12.** Read this file, `SHARED_CONTRACTS.md`, `PROGRESS.md`, `docs/EXAM_SOURCES.md`, and `CODEX_MIGRATION_PROMPT.md` before editing code. This is a **migration of an existing repository**, not permission to delete existing work.
 
+## Current runtime update — real accounts
+
+The active app uses verified-email accounts and cookie authentication; do not add
+persona selection, seed demo users, publish synthetic notices or fabricate real
+accounts. Fixture identities are enabled only by explicit isolated test factories.
+The production data path is `var/production/niyampulse.sqlite3`; preserve its real
+source evidence and Sarvam ledger. Read `docs/PRODUCTION_SETUP.md` for the manual
+SMTP/admin invitation checkpoint. Local HTTP is separate from production HTTPS;
+do not claim public deployment, real email delivery or legal/security certification
+without evidence. Historical milestone docs are archived in `docs/history/`.
+
 ## 1. Mission / product definition
 
 **NiyamPulse is a subscription-based, multilingual exam-update intelligence platform for Indian school students and engineering aspirants.** A person chooses exams/cycles (e.g., JEE Main 2027, NEET UG 2027, NDA I 2027, GATE 2027, UPSC ESE 2027, SSC JE 2026, SSC CGL 2026). The system periodically checks configured official announcement pages, identifies new notices, verifies source lineage, extracts evidence-linked changes, matches subscribed users, and produces in-app notifications. The operator dashboard shows genuine source health, notice review, subscriber matching and delivery metrics. **Users should not have to upload new PDFs** to receive updates from supported live sources.
